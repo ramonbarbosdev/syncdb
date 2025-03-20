@@ -41,6 +41,18 @@ public class DataSourceConfig
     {
         return cloudDataSourceProperties().initializeDataSourceBuilder().build();
     }
+    @Bean
+    @ConfigurationProperties("spring.datasource.w5i")
+    public DataSourceProperties w5iDataSourceProperties()
+    {
+        return new DataSourceProperties();
+    }
+
+    @Bean
+    public DataSource w5iDataSource()
+    {
+        return w5iDataSourceProperties().initializeDataSourceBuilder().build();
+    }
 
     @Bean
     @Qualifier("cloudDataSource")
@@ -51,6 +63,12 @@ public class DataSourceConfig
     @Bean
     @Qualifier("localDataSource")
     public JdbcTemplate localJdbcTemplate(@Qualifier("localDataSource") DataSource dataSource) {
+        return new JdbcTemplate(dataSource);
+    }
+
+    @Bean
+    @Qualifier("w5iDataSource")
+    public JdbcTemplate w5iJdbcTemplate(@Qualifier("w5iDataSource") DataSource dataSource) {
         return new JdbcTemplate(dataSource);
     }
 }

@@ -42,10 +42,21 @@ public class SincronizacaoController
 	{
 
 		List lista = databaseService.listDatabases();
-
-
+	
 		return new ResponseEntity<>(lista, HttpStatus.OK);
 
+	}
+    @GetMapping(value = "/existe/{base}", produces = "application/json")
+	public ResponseEntity<?> existeBase (@PathVariable (value="base") String base ) 
+	{
+		Boolean fl_existe = databaseService.verificarBase(base);
+
+		if(!fl_existe)
+		{
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
+		}
+
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"rsposata\": \"Base encontrada\"}");
 	}
 
 }

@@ -1,5 +1,6 @@
 package br.syncdb.service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,8 +17,25 @@ public class DatabaseService
     @Qualifier("cloudDataSource")
     private JdbcTemplate jdbcTemplate;
 
-    public List<String> listDatabases() {
+    public List<String> listDatabases()
+    {
         String sql = "SELECT datname FROM pg_database WHERE datistemplate = false";
+
         return jdbcTemplate.queryForList(sql, String.class);
+    }
+
+    public boolean verificarBase(String nomeBase)
+    {
+        List<String> databases = listDatabases();
+
+        for (String db : databases)
+        {
+            if (db.equals(nomeBase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
