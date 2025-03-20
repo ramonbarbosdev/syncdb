@@ -36,12 +36,24 @@ public class SincronizacaoController
 {
 	@Autowired
 	private DatabaseService databaseService;
+
 	
-    @GetMapping(value = "/bases", produces = "application/json")
+	
+    @GetMapping(value = "/base", produces = "application/json")
 	public ResponseEntity<List<?>> listaBase () 
 	{
 
 		List lista = databaseService.listDatabases();
+	
+		return new ResponseEntity<>(lista, HttpStatus.OK);
+
+	}
+	
+    @GetMapping(value = "/base/{base}", produces = "application/json")
+	public ResponseEntity<List<?>> listarTabelas ( @PathVariable (value="base") String base) 
+	{
+
+		List lista = databaseService.listarTabelasPorBase(base);
 	
 		return new ResponseEntity<>(lista, HttpStatus.OK);
 
@@ -56,7 +68,7 @@ public class SincronizacaoController
 	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
 		}
 
-		return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"rsposata\": \"Base encontrada\"}");
+		return ResponseEntity.status(HttpStatus.OK).body("{\"rsposata\": \"Base encontrada\"}");
 	}
 
 }
