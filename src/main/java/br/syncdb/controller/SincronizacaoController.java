@@ -50,10 +50,16 @@ public class SincronizacaoController
 	}
 	
     @GetMapping(value = "/base/{base}", produces = "application/json")
-	public ResponseEntity<List<?>> listarTabelas ( @PathVariable (value="base") String base) 
+	public ResponseEntity<?> listarTabelas ( @PathVariable (value="base") String base) 
 	{
-
+		//TODO: usar as tabelas para pegar os dados 
+		
 		List lista = databaseService.listarTabelasPorBase(base);
+
+		if(lista.isEmpty())
+		{
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
+		}
 	
 		return new ResponseEntity<>(lista, HttpStatus.OK);
 

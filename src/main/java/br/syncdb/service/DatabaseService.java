@@ -26,14 +26,20 @@ public class DatabaseService
     @Autowired
     private DataConfigGenerico dataConfigGenerico;
 
-    public List<String> listarTabelasPorBase(String nomeBase) {
-        // Cria um DataSource dinâmico para o banco de dados especificado
-        DataSource dataSource = dataConfigGenerico.createDataSource(nomeBase);
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+    public List<String> listarTabelasPorBase(String nomeBase)
+    {
+        if(verificarBase(nomeBase))
+        {
+            DataSource dataSource = dataConfigGenerico.createDataSource(nomeBase);
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-        String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
+            String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
 
-        return jdbcTemplate.queryForList(sql, String.class);
+            return jdbcTemplate.queryForList(sql, String.class);
+        }
+
+        return null;
+        
     }
 
     public List<String> listDatabases()
