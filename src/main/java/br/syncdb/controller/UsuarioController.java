@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -32,7 +33,7 @@ import br.syncdb.repository.UsuarioRepository;
 @RequestMapping(value = "/usuario")
 public class UsuarioController {
 	
-	@Autowired /*se fosse CDI seria @inject*/
+	@Autowired 
 	private UsuarioRepository usuarioRepository;
 	
 	/*SERVIÇO RESTFULL*/
