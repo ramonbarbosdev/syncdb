@@ -64,6 +64,59 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		
+		<!--Security		-->
+		<dependency>
+		    <groupId>org.springframework.boot</groupId>
+		    <artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		 <dependency>
+	        <groupId>io.jsonwebtoken</groupId>
+	        <artifactId>jjwt-api</artifactId>
+	        <version>0.11.2</version>
+	    </dependency>
+	    <dependency>
+	        <groupId>io.jsonwebtoken</groupId>
+	        <artifactId>jjwt-impl</artifactId>
+	        <version>0.11.2</version>
+	        <scope>runtime</scope> <!-- A implementação só é necessária em tempo de execução -->
+	    </dependency>
+	    <dependency>
+	        <groupId>io.jsonwebtoken</groupId>
+	        <artifactId>jjwt-jackson</artifactId>
+	        <version>0.11.2</version>
+	        <scope>runtime</scope> <!-- A serialização só é necessária em tempo de execução -->
+	    </dependency>
+		<!--Security-->
+		
+		<!--Outras Dependencias Adicionais-->
+		<dependency>
+		    <groupId>org.springframework.boot</groupId>
+		    <artifactId>spring-boot-starter-cache</artifactId>
+		    <version>3.3.0</version>
+		</dependency>
+			
+		  <dependency>
+		      <groupId>org.springframework.boot</groupId>
+		      <artifactId>spring-boot-starter-validation</artifactId>
+		   </dependency>
+	
+		   <dependency>
+			<groupId>javax.persistence</groupId>
+			<artifactId>javax.persistence-api</artifactId>
+			<version>2.2</version>
+		</dependency>
+		
+		<!--Pool de conexão-->
+		<dependency>
+		    <groupId>com.zaxxer</groupId>
+		    <artifactId>HikariCP</artifactId>
+		    <version>3.4.0</version>
+		</dependency>		
+		<!--Pool de conexão-->
+	
+	
 	</dependencies>
 
 	<build>
