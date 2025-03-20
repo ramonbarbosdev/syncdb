@@ -51,7 +51,6 @@ public class Usuario implements UserDetails {
 	private String token = "";
 	
 
-
 	@OneToMany(fetch = FetchType.EAGER)
 	@JoinTable( name = "usuarios_role",
 				uniqueConstraints = @UniqueConstraint(
