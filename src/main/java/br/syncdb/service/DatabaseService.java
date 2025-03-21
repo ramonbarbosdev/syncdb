@@ -1,5 +1,10 @@
 package br.syncdb.service;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,53 +31,70 @@ public class DatabaseService
     @Autowired
     private DataConfigGenerico dataConfigGenerico;
 
-    public List<String> listarTabelasPorBase(String nomeBase)
+    public List<String> listarBases(String tipo, String nomeBase)
     {
-        if(verificarBase(nomeBase))
-        {
-            DataSource dataSource = dataConfigGenerico.createDataSource(nomeBase);
+      
+            DataSource dataSource = dataConfigGenerico.createDataSource(tipo, nomeBase);
             JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-            String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
+            // // String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
+            String sql = "SELECT datname FROM pg_database WHERE datistemplate = false";
 
-            return jdbcTemplate.queryForList(sql, String.class);
-        }
+            List<String> listarTabelas = jdbcTemplate.queryForList(sql, String.class);;
+            return listarTabelas;
+        
 
-        return null;
+        // return null;
         
     }
 
-    public List<String> listDatabases()
+    public List<String> obterBanco(String base, String banco) 
     {
-        String sql = "SELECT datname FROM pg_database WHERE datistemplate = false";
-
-        return jdbcTemplate.queryForList(sql, String.class);
-    }
-
-    
-    public boolean verificarBase(String nomeBase)
-    {
-        List<String> databases = listDatabases();
-
-        for (String db : databases)
+        List<String> databases = listarBases("cloud",base);
+        String host = "db-postgresql-nyc3-32073-do-user-9424476-0.b.db.ondigitalocean.com";
+        String port = "25060";
+        String user = "doadmin";
+        String password = "AVNS_ThcFV7CzqE1EzYP7W8z";
+        List<String> listarTabelas = new ArrayList<>();
+        
+        for (String database : databases)
         {
-            if (db.equals(nomeBase))
+            if(banco.trim().equalsIgnoreCase(database.trim()))
             {
-                return true;
+                String url = "jdbc:postgresql://" + host + ":" + port + "/" + database; 
+                
+                // System.out.println("Banco de Dados: " + database);
+
+                try
+                {
+                    Connection connection = DriverManager.getConnection( url, user, password);
+                    Statement statement = connection.createStatement(); 
+    
+                    String query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
+                    ResultSet resultSet = statement.executeQuery(query);
+    
+                    while (resultSet.next())
+                    {
+                        String tableName = resultSet.getString("table_name");
+                        listarTabelas.add(tableName);
+
+                    }
+    
+                } 
+                catch (Exception e)
+                {
+                    
+                }
             }
+            else
+            {
+                // System.out.println("Banco não existe: " + database);
+
+            }
+           
         }
 
-        return false;
+        return listarTabelas;
     }
 
-    public List<String> sincronizarBase(String nomeBase)
-    {
-        String sql = "SELECT table_catalog FROM information_schema.tables  ";
-
-        Object[] args = { nomeBase };
-
-        List<String> list = jdbcTemplate.queryForList(sql,args, String.class);
-
-        return list;
-    }
 }

@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.UsuarioDTO;
+import br.syncdb.config.DataConfigGenerico;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
 import br.syncdb.service.DatabaseService;
@@ -39,22 +40,21 @@ public class SincronizacaoController
 
 	
 	
-    @GetMapping(value = "/base", produces = "application/json")
-	public ResponseEntity<List<?>> listaBase () 
-	{
+    // @GetMapping(value = "/base", produces = "application/json")
+	// public ResponseEntity<List<?>> listaBase () 
+	// {
 
-		List lista = databaseService.listDatabases();
+	// 	List lista = databaseService.listDatabases();
 	
-		return new ResponseEntity<>(lista, HttpStatus.OK);
+	// 	return new ResponseEntity<>(lista, HttpStatus.OK);
 
-	}
+	// }
 	
-    @GetMapping(value = "/base/{base}", produces = "application/json")
-	public ResponseEntity<?> listarTabelas ( @PathVariable (value="base") String base) 
+    @GetMapping(value = "/base/{base}/{banco}", produces = "application/json")
+	public ResponseEntity<?> listarTabelas ( @PathVariable (value = "base") String base ,  @PathVariable (value = "banco") String banco) 
 	{
-		//TODO: usar as tabelas para pegar os dados 
 		
-		List lista = databaseService.listarTabelasPorBase(base);
+		List lista = databaseService.obterBanco(base, banco);
 
 		if(lista.isEmpty())
 		{
@@ -64,17 +64,6 @@ public class SincronizacaoController
 		return new ResponseEntity<>(lista, HttpStatus.OK);
 
 	}
-    @GetMapping(value = "/existe/{base}", produces = "application/json")
-	public ResponseEntity<?> existeBase (@PathVariable (value="base") String base ) 
-	{
-		Boolean fl_existe = databaseService.verificarBase(base);
-
-		if(!fl_existe)
-		{
-	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
-		}
-
-		return ResponseEntity.status(HttpStatus.OK).body("{\"rsposata\": \"Base encontrada\"}");
-	}
+   
 
 }
