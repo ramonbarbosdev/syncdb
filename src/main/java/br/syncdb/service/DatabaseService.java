@@ -31,16 +31,23 @@ public class DatabaseService
     // @Qualifier("cloudDataSource")
     // private JdbcTemplate jdbcTemplate;
 
-    public List<String> listarBases(String nomeBase, TipoConexao  tipo) {
+    public List<String> listarBases(String nomeBase, TipoConexao  tipo)
+    {
         List<String> bases = new ArrayList<>();
-        try (Connection conexao = ConexaoBanco.abrirConexao(nomeBase, tipo)) {
+
+        try (Connection conexao = ConexaoBanco.abrirConexao(nomeBase, tipo))
+        {
             String query = "SELECT datname FROM pg_database WHERE datistemplate = false";
-            try (var stmt = conexao.createStatement(); var rs = stmt.executeQuery(query)) {
-                while (rs.next()) {
-                    bases.add(rs.getString("datname"));
-                }
+            
+            var stmt = conexao.createStatement();
+            var rs = stmt.executeQuery(query);
+
+            while (rs.next()) {
+                bases.add(rs.getString("datname"));
             }
-        } catch (SQLException e) {
+        }
+        catch (SQLException e)
+        {
             e.printStackTrace();
         }
         return bases;
@@ -48,7 +55,7 @@ public class DatabaseService
 
     public List<String> obterBanco(String base, String banco, TipoConexao  tipo) 
     {
-        // List<String> databases = listarBases(tipo, base);
+
         List<String> databases = listarBases( base, tipo);
         List<String> listarTabelas = new ArrayList<>();
 

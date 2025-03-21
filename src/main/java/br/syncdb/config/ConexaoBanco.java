@@ -42,9 +42,6 @@ public class ConexaoBanco {
         String user = ConfiguracaoBanco.get(prefixo + ".username");
         String password = ConfiguracaoBanco.get(prefixo + ".password");
 
-    
-        
-       
         String url = "jdbc:postgresql://" + host + ":" + port + "/" + database;
         return DriverManager.getConnection(url, user, password);
 
