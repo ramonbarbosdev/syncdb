@@ -30,6 +30,8 @@ public class DatabaseService
 
     @Autowired
     private DataConfigGenerico dataConfigGenerico;
+    
+    
 
     public List<String> listarBases(String tipo, String nomeBase)
     {
@@ -58,13 +60,15 @@ public class DatabaseService
             return null;
         }
         
+        Statement statement = abrirConexao(banco);
+
+
         for (String database : databases)
         {
             if(banco.trim().equalsIgnoreCase(database.trim()))
             {
                 try
                 {
-                    Statement statement = abrirConexao(database);
     
                     String query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
                     ResultSet resultSet = statement.executeQuery(query);
@@ -86,11 +90,102 @@ public class DatabaseService
         return listarTabelas;
     }
 
-    public  List<String> obterEstruturaTabela(String base, String banco)
+    public  StringBuilder obterEstruturaTabela(String base, String banco)
     {
-        List<String> listaBanco = obterBanco( base,  banco);
+        List<String> tabelas = obterBanco( base,  banco);
+        StringBuilder estuturaTabela = new StringBuilder();
+
+        String tabelaTeste = "operacao_lote";
+
+
+        if(tabelas != null)
+        {
+            Statement statement = abrirConexao(banco);
+
+            for(String tabela : tabelas)
+            {
+               try
+               {
+                    String querySequencia = criarSequenciaQuery(statement, tabelaTeste);
+                    estuturaTabela.append(querySequencia);
+
+                    String scriptTabela = criarCriacaoTabelaQuery( statement,  tabelaTeste);
+                    estuturaTabela.append(scriptTabela);
+                    
+                    break;
+
+               }
+               catch (Exception e)
+               {
+                // TODO: handle exception
+               }
+                                
+            }
+        }
         
-        return listaBanco;
+        return estuturaTabela;
+    }
+
+    public static String criarCriacaoTabelaQuery(Statement statement, String tabelaOrigem) throws SQLException
+    {
+        String query = "SELECT column_name, data_type, is_nullable, column_default " 
+                                    + "FROM information_schema.columns " 
+                                    + "WHERE table_name = '" + tabelaOrigem + "' " 
+                                    + "ORDER BY column_name;";
+
+        ResultSet resultadoQuery = statement.executeQuery(query);
+        
+        StringBuilder createTableQuery = new StringBuilder();
+
+        createTableQuery.append("CREATE TABLE " + tabelaOrigem + " (");
+        
+        // createTableQuery.append(querySequencia);
+
+        while (resultadoQuery.next()) {
+            String nomeColuna = resultadoQuery.getString("column_name");
+            String tipoColuna = resultadoQuery.getString("data_type");
+            String nullable = resultadoQuery.getString("is_nullable");
+            String defaultColuna = resultadoQuery.getString("column_default");
+
+            createTableQuery.append(nomeColuna).append(" ").append(tipoColuna);
+
+            if ("NO".equalsIgnoreCase(nullable)) {
+                createTableQuery.append(" NOT NULL");
+            }
+
+            if (defaultColuna != null) {
+                createTableQuery.append(" DEFAULT ").append(defaultColuna);
+            }
+
+            createTableQuery.append(", ");
+        }
+        
+        createTableQuery.setLength(createTableQuery.length() - 2);
+        createTableQuery.append(");");
+
+
+        return createTableQuery.toString();
+    }
+    public static String criarSequenciaQuery(Statement statement, String tabelaOrigem) throws SQLException
+    {
+        String query = "  select column_name  FROM information_schema.columns  " 
+                                      + "WHERE table_name = '" + tabelaOrigem + "' " 
+                                      + "  and column_default is not NULL";
+  
+        ResultSet resultadoQuery = statement.executeQuery(query);
+
+        //criar sequencia 
+        StringBuilder createSequenceQuery = new StringBuilder();
+
+        while (resultadoQuery.next())
+        {
+            String nomeColunaSeq = resultadoQuery.getString("column_name");
+            createSequenceQuery.append("CREATE SEQUENCE IF NOT EXISTS ")
+                               .append(tabelaOrigem).append("_").append(nomeColunaSeq).append("_seq ")
+                               .append("START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1; ");
+        }
+
+        return createSequenceQuery.toString();
     }
 
 

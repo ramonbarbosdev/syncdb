@@ -54,7 +54,7 @@ public class SincronizacaoController
 	public ResponseEntity<?> listarTabelas ( @PathVariable (value = "base") String base ,  @PathVariable (value = "banco") String banco) 
 	{
 		
-		List lista = databaseService.obterEstruturaTabela(base, banco);
+		StringBuilder lista = databaseService.obterEstruturaTabela(base, banco);
 
 		if(lista.isEmpty())
 		{

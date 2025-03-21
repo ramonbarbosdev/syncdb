@@ -107,6 +107,10 @@
 			<artifactId>javax.persistence-api</artifactId>
 			<version>2.2</version>
 		</dependency>
+
+		<!--Query Builde-->
+		
+		<!--Query Builde-->
 		
 		<!--Pool de conexão-->
 		<dependency>
@@ -114,6 +118,7 @@
 		    <artifactId>HikariCP</artifactId>
 		    <version>3.4.0</version>
 		</dependency>		
+		
 		<!--Pool de conexão-->
 	
 	
