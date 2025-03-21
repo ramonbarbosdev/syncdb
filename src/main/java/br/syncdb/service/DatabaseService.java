@@ -17,42 +17,59 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import br.syncdb.config.DataConfigGenerico;
-import br.syncdb.config.DataSourceConfig;
+import br.syncdb.config.DatabaseConnection;
+
 
 @Service
 public class DatabaseService  
 {
     
-    @Autowired
-    @Qualifier("cloudDataSource")
-    private JdbcTemplate jdbcTemplate;
+    // @Autowired
+    // @Qualifier("cloudDataSource")
+    // private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private DataConfigGenerico dataConfigGenerico;
-    
-    
-
-    public List<String> listarBases(String tipo, String nomeBase)
+    public List<String> listarBases( String nomeBase, String tipo)
     {
-      
-            DataSource dataSource = dataConfigGenerico.createDataSource(tipo, nomeBase);
-            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-
-            // // String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
-            String sql = "SELECT datname FROM pg_database WHERE datistemplate = false";
-
-            List<String> listarTabelas = jdbcTemplate.queryForList(sql, String.class);;
-            return listarTabelas;
         
+        List<String> bases = new ArrayList<>(); 
+        try
+        {
 
-        // return null;
+            // DatabaseConnection dbConnection = new DatabaseConnection(tipo);
+            // Connection connection = dbConnection.abrirConexao();
+            
+            // if (connection != null) {
+            //     System.out.println("Conexão estabelecida com sucesso!");
+            //     // Aqui você pode executar suas consultas
+            // } else {
+            //     System.out.println("Falha ao estabelecer a conexão.");
+            // }
+
+            Statement conexao = abrirConexao(nomeBase); 
+    
+            String query = "SELECT datname FROM pg_database WHERE datistemplate = false";
+            ResultSet resultSet = conexao.executeQuery(query);
+    
+            while (resultSet.next()) {
+                String nomeBanco = resultSet.getString("datname");
+                bases.add(nomeBanco); 
+            }
+    
+            resultSet.close();
+            conexao.close();
+    
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    
+        return bases; 
         
     }
 
-    public List<String> obterBanco(String base, String banco) 
+    public List<String> obterBanco(String base, String banco, String tipo) 
     {
-        List<String> databases = listarBases("cloud",base);
+        // List<String> databases = listarBases(tipo, base);
+        List<String> databases = listarBases( base, tipo);
         List<String> listarTabelas = new ArrayList<>();
 
         if(databases == null)
@@ -60,18 +77,16 @@ public class DatabaseService
             return null;
         }
         
-        Statement statement = abrirConexao(banco);
-
-
+        Statement conexao = abrirConexao(banco);
+        
         for (String database : databases)
         {
             if(banco.trim().equalsIgnoreCase(database.trim()))
             {
                 try
                 {
-    
                     String query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
-                    ResultSet resultSet = statement.executeQuery(query);
+                    ResultSet resultSet = conexao.executeQuery(query);
     
                     while (resultSet.next())
                     {
@@ -90,45 +105,27 @@ public class DatabaseService
         return listarTabelas;
     }
 
-    public  StringBuilder obterEstruturaTabela(String base, String banco)
-    {
-        List<String> tabelas = obterBanco( base,  banco);
-        StringBuilder estuturaTabela = new StringBuilder();
 
-        String tabelaTeste = "fonte_recurso";
-
-
-        if(tabelas != null)
-        {
-            Statement statement = abrirConexao(banco);
-
-            for(String tabela : tabelas)
-            {
-               try
-               {
-                    String scriptTabela = criarCriacaoTabelaQuery( statement,  tabelaTeste);
-             
-                    estuturaTabela.append(scriptTabela);
-                    
-                    break;
-
-               }
-               catch (Exception e)
-               {
-                // TODO: handle exception
-               }
-                                
-            }
+    public boolean verificarTabelaExistente(Statement conexao, String tabelaNome) throws SQLException {
+        String query = "SELECT EXISTS (" +
+                       "SELECT 1 " +
+                       "FROM information_schema.tables " +
+                       "WHERE table_schema = 'public' " +
+                       "AND table_name = '" + tabelaNome + "'" +
+                       ");";
+    
+        ResultSet resultadoQuery = conexao.executeQuery(query);
+        if (resultadoQuery.next()) {
+            return resultadoQuery.getBoolean(1); // Retorna true se a tabela existir
         }
-        
-        return estuturaTabela;
+        return false; // Retorna false se não houver resultado
     }
 
-    public static String criarCriacaoTabelaQuery( Statement statement ,String tabelaOrigem)
+    public static String criarCriacaoTabelaQuery( Statement conexao ,String tabelaOrigem)
     {
         StringBuilder createTableScript = new StringBuilder();
 
-        String scriptSequencia = criarSequenciaQuery( statement,  tabelaOrigem);
+        String scriptSequencia = criarSequenciaQuery( conexao,  tabelaOrigem);
 
         createTableScript.append(scriptSequencia+ "\n");
 
@@ -142,7 +139,7 @@ public class DatabaseService
                            "WHERE table_name = '" + tabelaOrigem + "' " +
                            "AND table_schema = 'public';";
 
-            ResultSet resultadoQuery = statement.executeQuery(query);
+            ResultSet resultadoQuery = conexao.executeQuery(query);
 
             while (resultadoQuery.next()) {
                 String nomeColuna = resultadoQuery.getString("column_name").trim();
@@ -182,7 +179,7 @@ public class DatabaseService
                                       "JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name " +
                                       "WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = '" + tabelaOrigem + "';";
 
-            ResultSet foreignKeyResultSet = statement.executeQuery(foreignKeyQuery);
+            ResultSet foreignKeyResultSet = conexao.executeQuery(foreignKeyQuery);
             while (foreignKeyResultSet.next()) {
                 String constraintName = foreignKeyResultSet.getString("constraint_name");
                 String columnName = foreignKeyResultSet.getString("column_name");
@@ -198,7 +195,7 @@ public class DatabaseService
 
             // Obter índices
             String indexQuery = "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '" + tabelaOrigem + "';";
-            ResultSet indexResultSet = statement.executeQuery(indexQuery);
+            ResultSet indexResultSet = conexao.executeQuery(indexQuery);
             while (indexResultSet.next()) {
                 String indexName = indexResultSet.getString("indexname");
                 String indexDef = indexResultSet.getString("indexdef");
@@ -212,7 +209,7 @@ public class DatabaseService
         
         return createTableScript.toString();
     }
-    public static String criarSequenciaQuery(Statement statement, String tabelaOrigem) 
+    public static String criarSequenciaQuery(Statement conexao, String tabelaOrigem) 
     {
         try 
         {
@@ -220,7 +217,7 @@ public class DatabaseService
             + "WHERE table_name = '" + tabelaOrigem + "' " 
             + " and column_default ilike '%nextval%' ";
 
-            ResultSet resultadoQuery = statement.executeQuery(query);
+            ResultSet resultadoQuery = conexao.executeQuery(query);
 
             //criar sequencia 
             StringBuilder createSequenceQuery = new StringBuilder();
@@ -258,8 +255,8 @@ public class DatabaseService
             String url = "jdbc:postgresql://" + host + ":" + port + "/" + database; 
     
             Connection connection = DriverManager.getConnection( url, user, password);
-            Statement statement = (Statement) connection.createStatement(); 
-            return statement;
+            Statement conexao = (Statement) connection.createStatement(); 
+            return conexao;
 
         }
         catch (Exception e)
@@ -270,5 +267,6 @@ public class DatabaseService
         return null;
 
     }
+   
 
 }

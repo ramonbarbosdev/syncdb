@@ -26,10 +26,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.UsuarioDTO;
-import br.syncdb.config.DataConfigGenerico;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
 import br.syncdb.service.DatabaseService;
+import br.syncdb.service.SincronizacaoService;
 
 @RestController 
 @RequestMapping(value = "/sincronizacao")
@@ -38,7 +38,8 @@ public class SincronizacaoController
 	@Autowired
 	private DatabaseService databaseService;
 
-	
+	@Autowired
+	private SincronizacaoService sincronizacaoService;
 	
     // @GetMapping(value = "/base", produces = "application/json")
 	// public ResponseEntity<List<?>> listaBase () 
@@ -54,7 +55,7 @@ public class SincronizacaoController
 	public ResponseEntity<?> listarTabelas ( @PathVariable (value = "base") String base ,  @PathVariable (value = "banco") String banco) 
 	{
 		
-		StringBuilder lista = databaseService.obterEstruturaTabela(base, banco);
+		StringBuilder lista = sincronizacaoService.obterEstruturaTabela(base, banco);
 
 		if(lista.isEmpty())
 		{
