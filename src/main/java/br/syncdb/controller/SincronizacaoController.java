@@ -2,6 +2,7 @@ package br.syncdb.controller;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -55,7 +56,7 @@ public class SincronizacaoController
 	public ResponseEntity<?> listarTabelas ( @PathVariable (value = "base") String base ,  @PathVariable (value = "banco") String banco) 
 	{
 		
-		StringBuilder lista = sincronizacaoService.obterEstruturaTabela(base, banco);
+		Map<String, String> lista = sincronizacaoService.executarCriacaoTabela(base, banco);
 
 		if(lista.isEmpty())
 		{

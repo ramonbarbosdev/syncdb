@@ -50,6 +50,10 @@ public class DatabaseService
         {
             e.printStackTrace();
         }
+        finally
+        {
+            ConexaoBanco.fecharConexao(nomeBase);
+        }
         return bases;
     }
 
@@ -89,6 +93,10 @@ public class DatabaseService
         {
             System.out.println(e.getMessage());
         }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
+        }
             
         return listarTabelas;
     }
@@ -96,23 +104,34 @@ public class DatabaseService
    
 
 
-    public boolean verificarTabelaExistente(Connection conexao, String tabelaNome) throws SQLException
+    public boolean verificarTabelaExistente( String base, TipoConexao tipo, String tabelaNome) throws SQLException
     {
-        String query = "SELECT EXISTS (" +
-                       "SELECT 1 " +
-                       "FROM information_schema.tables " +
-                       "WHERE table_schema = 'public' " +
-                       "AND table_name = '" + tabelaNome + "'" +
-                       ");";
-        
-        var stmt = conexao.createStatement();
-        var rs = stmt.executeQuery(query);
 
-        if (rs.next())
+        try
         {
-            return rs.getBoolean(1); // Retorna true se a tabela existir
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            String query = "SELECT EXISTS (" +
+                        "SELECT 1 " +
+                        "FROM information_schema.tables " +
+                        "WHERE table_schema = 'public' " +
+                        "AND table_name = '" + tabelaNome + "'" +
+                        ");";
+
+                var stmt = conexao.createStatement();
+                var rs = stmt.executeQuery(query);
+
+                if (rs.next())
+                {
+                return rs.getBoolean(1); 
+                }
+
+        } catch (Exception e) {
+            // TODO: handle exception
         }
-        return false; // Retorna false se não houver resultado
+
+       
+        return false; 
     }
 
     public static String criarCriacaoTabelaQuery( Connection conexao ,String tabelaOrigem)
@@ -245,36 +264,5 @@ public class DatabaseService
     }
 
 
-
-    public Statement abrirConexao(String database) 
-    {
-
-        try
-        {
-            String host = "db-postgresql-nyc3-32073-do-user-9424476-0.b.db.ondigitalocean.com";
-            String port = "25060";
-            String user = "doadmin";
-            String password = "AVNS_ThcFV7CzqE1EzYP7W8z";
-            String url = "jdbc:postgresql://" + host + ":" + port + "/" + database; 
-    
-            Connection connection = DriverManager.getConnection( url, user, password);
-            Statement conexao = (Statement) connection.createStatement(); 
-            return conexao;
-
-        }
-        catch (Exception e)
-        {
-            System.out.println(e.getMessage());
-        }
-        
-        return null;
-
-    }
-
-    public List<String> obterBanco(String base, String banco, String string) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'obterBanco'");
-    }
-   
 
 }
