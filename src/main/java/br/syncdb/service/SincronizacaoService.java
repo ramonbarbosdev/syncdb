@@ -1,5 +1,6 @@
 package br.syncdb.service;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.syncdb.config.ConexaoBanco;
 import br.syncdb.controller.TipoConexao;
 
 @Service
@@ -26,13 +28,12 @@ public class SincronizacaoService
 
         if(tabelas != null)
         {
-            Statement conexaoCloud = databaseService.abrirConexao(banco);
-
-            for(String tabela : tabelas)
+            try
             {
-               try
-               {
-                    String scriptTabela = databaseService.criarCriacaoTabelaQuery( conexaoCloud,  tabelaTeste);
+                for(String tabela : tabelas)
+                {
+                    Connection conexao = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+                    String scriptTabela = databaseService.criarCriacaoTabelaQuery( conexao,  tabelaTeste);
                     estuturaTabela.append(scriptTabela);
 
                     // if (!databaseService.verificarTabelaExistente(conexaoCloud, tabela)) 
@@ -42,18 +43,16 @@ public class SincronizacaoService
                     //     System.out.println("Tabela criada com sucesso: " + tabela);
 
                     // }
-             
-                    
                 
-                    
-                    break;
 
-               }
-                catch (Exception e) {
-                    e.printStackTrace();
+                    break;             
                 }
-                                
             }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+                    
+
         }
         
         return estuturaTabela;

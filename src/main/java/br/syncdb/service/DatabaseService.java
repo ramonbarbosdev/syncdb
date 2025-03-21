@@ -38,7 +38,7 @@ public class DatabaseService
         try (Connection conexao = ConexaoBanco.abrirConexao(nomeBase, tipo))
         {
             String query = "SELECT datname FROM pg_database WHERE datistemplate = false";
-            
+
             var stmt = conexao.createStatement();
             var rs = stmt.executeQuery(query);
 
@@ -63,52 +63,59 @@ public class DatabaseService
         {
             return null;
         }
-        
-        Statement conexao = abrirConexao(banco);
-        
-        for (String database : databases)
+
+        try
         {
-            if(banco.trim().equalsIgnoreCase(database.trim()))
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            for (String database : databases)
             {
-                try
+                if(banco.trim().equalsIgnoreCase(database.trim()))
                 {
                     String query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
-                    ResultSet resultSet = conexao.executeQuery(query);
-    
-                    while (resultSet.next())
+                    var stmt = conexao.createStatement();
+                    var rs = stmt.executeQuery(query);
+                
+                    while (rs.next())
                     {
-                        String tableName = resultSet.getString("table_name");
+                        String tableName = rs.getString("table_name");
                         listarTabelas.add(tableName);
                     }
-                    
-                }
-                catch (Exception e)
-                {
-                    System.out.println(e.getMessage());
                 }
             }
-        }
 
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+        }
+            
         return listarTabelas;
     }
 
+   
 
-    public boolean verificarTabelaExistente(Statement conexao, String tabelaNome) throws SQLException {
+
+    public boolean verificarTabelaExistente(Connection conexao, String tabelaNome) throws SQLException
+    {
         String query = "SELECT EXISTS (" +
                        "SELECT 1 " +
                        "FROM information_schema.tables " +
                        "WHERE table_schema = 'public' " +
                        "AND table_name = '" + tabelaNome + "'" +
                        ");";
-    
-        ResultSet resultadoQuery = conexao.executeQuery(query);
-        if (resultadoQuery.next()) {
-            return resultadoQuery.getBoolean(1); // Retorna true se a tabela existir
+        
+        var stmt = conexao.createStatement();
+        var rs = stmt.executeQuery(query);
+
+        if (rs.next())
+        {
+            return rs.getBoolean(1); // Retorna true se a tabela existir
         }
         return false; // Retorna false se não houver resultado
     }
 
-    public static String criarCriacaoTabelaQuery( Statement conexao ,String tabelaOrigem)
+    public static String criarCriacaoTabelaQuery( Connection conexao ,String tabelaOrigem)
     {
         StringBuilder createTableScript = new StringBuilder();
 
@@ -126,7 +133,8 @@ public class DatabaseService
                            "WHERE table_name = '" + tabelaOrigem + "' " +
                            "AND table_schema = 'public';";
 
-            ResultSet resultadoQuery = conexao.executeQuery(query);
+            var stmt = conexao.createStatement();
+            var resultadoQuery = stmt.executeQuery(query);
 
             while (resultadoQuery.next()) {
                 String nomeColuna = resultadoQuery.getString("column_name").trim();
@@ -166,7 +174,11 @@ public class DatabaseService
                                       "JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name " +
                                       "WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = '" + tabelaOrigem + "';";
 
-            ResultSet foreignKeyResultSet = conexao.executeQuery(foreignKeyQuery);
+
+
+            stmt = conexao.createStatement();
+            var foreignKeyResultSet = stmt.executeQuery(foreignKeyQuery);
+
             while (foreignKeyResultSet.next()) {
                 String constraintName = foreignKeyResultSet.getString("constraint_name");
                 String columnName = foreignKeyResultSet.getString("column_name");
@@ -182,7 +194,10 @@ public class DatabaseService
 
             // Obter índices
             String indexQuery = "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '" + tabelaOrigem + "';";
-            ResultSet indexResultSet = conexao.executeQuery(indexQuery);
+
+            stmt = conexao.createStatement();
+            var indexResultSet = stmt.executeQuery(indexQuery);
+
             while (indexResultSet.next()) {
                 String indexName = indexResultSet.getString("indexname");
                 String indexDef = indexResultSet.getString("indexdef");
@@ -196,7 +211,7 @@ public class DatabaseService
         
         return createTableScript.toString();
     }
-    public static String criarSequenciaQuery(Statement conexao, String tabelaOrigem) 
+    public static String criarSequenciaQuery(Connection conexao, String tabelaOrigem) 
     {
         try 
         {
@@ -204,7 +219,8 @@ public class DatabaseService
             + "WHERE table_name = '" + tabelaOrigem + "' " 
             + " and column_default ilike '%nextval%' ";
 
-            ResultSet resultadoQuery = conexao.executeQuery(query);
+            var stmt = conexao.createStatement();
+            var resultadoQuery = stmt.executeQuery(query);
 
             //criar sequencia 
             StringBuilder createSequenceQuery = new StringBuilder();
