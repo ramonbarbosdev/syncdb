@@ -51,24 +51,20 @@ public class DatabaseService
     public List<String> obterBanco(String base, String banco) 
     {
         List<String> databases = listarBases("cloud",base);
-        String host = "db-postgresql-nyc3-32073-do-user-9424476-0.b.db.ondigitalocean.com";
-        String port = "25060";
-        String user = "doadmin";
-        String password = "AVNS_ThcFV7CzqE1EzYP7W8z";
         List<String> listarTabelas = new ArrayList<>();
+
+        if(databases == null)
+        {
+            return null;
+        }
         
         for (String database : databases)
         {
             if(banco.trim().equalsIgnoreCase(database.trim()))
             {
-                String url = "jdbc:postgresql://" + host + ":" + port + "/" + database; 
-                
-                // System.out.println("Banco de Dados: " + database);
-
                 try
                 {
-                    Connection connection = DriverManager.getConnection( url, user, password);
-                    Statement statement = connection.createStatement(); 
+                    Statement statement = abrirConexao(database);
     
                     String query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
                     ResultSet resultSet = statement.executeQuery(query);
@@ -77,24 +73,51 @@ public class DatabaseService
                     {
                         String tableName = resultSet.getString("table_name");
                         listarTabelas.add(tableName);
-
                     }
-    
-                } 
-                catch (Exception e)
-                {
                     
                 }
+                catch (Exception e)
+                {
+                    System.out.println(e.getMessage());
+                }
             }
-            else
-            {
-                // System.out.println("Banco não existe: " + database);
-
-            }
-           
         }
 
         return listarTabelas;
+    }
+
+    public  List<String> obterEstruturaTabela(String base, String banco)
+    {
+        List<String> listaBanco = obterBanco( base,  banco);
+        
+        return listaBanco;
+    }
+
+
+
+    public Statement abrirConexao(String database) 
+    {
+
+        try
+        {
+            String host = "db-postgresql-nyc3-32073-do-user-9424476-0.b.db.ondigitalocean.com";
+            String port = "25060";
+            String user = "doadmin";
+            String password = "AVNS_ThcFV7CzqE1EzYP7W8z";
+            String url = "jdbc:postgresql://" + host + ":" + port + "/" + database; 
+    
+            Connection connection = DriverManager.getConnection( url, user, password);
+            Statement statement = (Statement) connection.createStatement(); 
+            return statement;
+
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+        }
+        
+        return null;
+
     }
 
 }
