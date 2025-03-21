@@ -106,9 +106,6 @@ public class DatabaseService
             {
                try
                {
-                    String querySequencia = criarSequenciaQuery(statement, tabelaTeste);
-                    estuturaTabela.append(querySequencia);
-
                     String scriptTabela = criarCriacaoTabelaQuery( statement,  tabelaTeste);
                     estuturaTabela.append(scriptTabela);
                     
@@ -126,70 +123,89 @@ public class DatabaseService
         return estuturaTabela;
     }
 
-    public static String criarCriacaoTabelaQuery(Statement statement, String tabelaOrigem) throws SQLException
+    public static String criarCriacaoTabelaQuery( Statement statement ,String tabelaOrigem)
     {
-        String query = "SELECT column_name, data_type, is_nullable, column_default " 
-                                    + "FROM information_schema.columns " 
-                                    + "WHERE table_name = '" + tabelaOrigem + "' " 
-                                    + "ORDER BY column_name;";
+        StringBuilder createTableScript = new StringBuilder();
 
-        ResultSet resultadoQuery = statement.executeQuery(query);
-        
-        StringBuilder createTableQuery = new StringBuilder();
+        createTableScript.append("CREATE TABLE " + tabelaOrigem + " (\n");
 
-        createTableQuery.append("CREATE TABLE " + tabelaOrigem + " (");
-        
-        // createTableQuery.append(querySequencia);
-
-        while (resultadoQuery.next()) {
-            String nomeColuna = resultadoQuery.getString("column_name");
-            String tipoColuna = resultadoQuery.getString("data_type");
-            String nullable = resultadoQuery.getString("is_nullable");
-            String defaultColuna = resultadoQuery.getString("column_default");
-
-            createTableQuery.append(nomeColuna).append(" ").append(tipoColuna);
-
-            if ("NO".equalsIgnoreCase(nullable)) {
-                createTableQuery.append(" NOT NULL");
-            }
-
-            if (defaultColuna != null) {
-                createTableQuery.append(" DEFAULT ").append(defaultColuna);
-            }
-
-            createTableQuery.append(", ");
-        }
-        
-        createTableQuery.setLength(createTableQuery.length() - 2);
-        createTableQuery.append(");");
-
-
-        return createTableQuery.toString();
-    }
-    public static String criarSequenciaQuery(Statement statement, String tabelaOrigem) throws SQLException
-    {
-        String query = "  select column_name  FROM information_schema.columns  " 
-                                      + "WHERE table_name = '" + tabelaOrigem + "' " 
-                                      + "  and column_default is not NULL";
-  
-        ResultSet resultadoQuery = statement.executeQuery(query);
-
-        //criar sequencia 
-        StringBuilder createSequenceQuery = new StringBuilder();
-
-        while (resultadoQuery.next())
+        try 
         {
-            String nomeColunaSeq = resultadoQuery.getString("column_name");
-            createSequenceQuery.append("CREATE SEQUENCE IF NOT EXISTS ")
-                               .append(tabelaOrigem).append("_").append(nomeColunaSeq).append("_seq ")
-                               .append("START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1; ");
+
+            String query = "SELECT column_name, data_type, is_nullable, column_default " +
+                           "FROM information_schema.columns " +
+                           "WHERE table_name = '" + tabelaOrigem + "' " +
+                           "AND table_schema = 'public';";
+
+            ResultSet resultadoQuery = statement.executeQuery(query);
+
+            while (resultadoQuery.next()) {
+                String nomeColuna = resultadoQuery.getString("column_name");
+                String tipoColuna = resultadoQuery.getString("data_type");
+                String nullable = resultadoQuery.getString("is_nullable");
+                String defaultColuna = resultadoQuery.getString("column_default");
+
+                createTableScript.append("    ").append(nomeColuna).append(" ").append(tipoColuna);
+
+                if ("NO".equalsIgnoreCase(nullable)) {
+                    createTableScript.append(" NOT NULL");
+                }
+
+                if (defaultColuna != null) {
+                    createTableScript.append(" DEFAULT ").append(defaultColuna);
+                }
+
+                createTableScript.append(",\n");
+            }
+
+   
+            if (createTableScript.length() > 2)
+            {
+                createTableScript.setLength(createTableScript.length() - 2); 
+            }
+
+            createTableScript.append("\n);\n");
+
+            // obter chaves estrangeiras
+            String foreignKeyQuery = "SELECT tc.constraint_name, kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name " +
+                                      "FROM information_schema.table_constraints AS tc " +
+                                      "JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name " +
+                                      "JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name " +
+                                      "WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = '" + tabelaOrigem + "';";
+
+            ResultSet foreignKeyResultSet = statement.executeQuery(foreignKeyQuery);
+            while (foreignKeyResultSet.next()) {
+                String constraintName = foreignKeyResultSet.getString("constraint_name");
+                String columnName = foreignKeyResultSet.getString("column_name");
+                String foreignTableName = foreignKeyResultSet.getString("foreign_table_name");
+                String foreignColumnName = foreignKeyResultSet.getString("foreign_column_name");
+
+                createTableScript.append("ALTER TABLE ").append(tabelaOrigem)
+                                 .append(" ADD CONSTRAINT ").append(constraintName)
+                                 .append(" FOREIGN KEY (").append(columnName)
+                                 .append(") REFERENCES ").append(foreignTableName)
+                                 .append("(").append(foreignColumnName).append(");\n");
+            }
+
+            // obter índices
+            String indexQuery = "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '" + tabelaOrigem + "';";
+            ResultSet indexResultSet = statement.executeQuery(indexQuery);
+            while (indexResultSet.next()) {
+                String indexName = indexResultSet.getString("indexname");
+                String indexDef = indexResultSet.getString("indexdef");
+
+                createTableScript.append(indexDef).append(";\n");
+            }
+
+        }
+        catch (SQLException e)
+        {
+            e.printStackTrace();
         }
 
-        return createSequenceQuery.toString();
+        return createTableScript.toString();
     }
-
-
-
+   
     public Statement abrirConexao(String database) 
     {
 
