@@ -2,6 +2,7 @@ package br.syncdb.service;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -17,7 +18,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import br.syncdb.config.ConexaoBanco;
 import br.syncdb.config.DatabaseConnection;
+import br.syncdb.controller.TipoConexao;
 
 
 @Service
@@ -28,45 +31,22 @@ public class DatabaseService
     // @Qualifier("cloudDataSource")
     // private JdbcTemplate jdbcTemplate;
 
-    public List<String> listarBases( String nomeBase, String tipo)
-    {
-        
-        List<String> bases = new ArrayList<>(); 
-        try
-        {
-
-            // DatabaseConnection dbConnection = new DatabaseConnection(tipo);
-            // Connection connection = dbConnection.abrirConexao();
-            
-            // if (connection != null) {
-            //     System.out.println("Conexão estabelecida com sucesso!");
-            //     // Aqui você pode executar suas consultas
-            // } else {
-            //     System.out.println("Falha ao estabelecer a conexão.");
-            // }
-
-            Statement conexao = abrirConexao(nomeBase); 
-    
+    public List<String> listarBases(String nomeBase, TipoConexao  tipo) {
+        List<String> bases = new ArrayList<>();
+        try (Connection conexao = ConexaoBanco.abrirConexao(nomeBase, tipo)) {
             String query = "SELECT datname FROM pg_database WHERE datistemplate = false";
-            ResultSet resultSet = conexao.executeQuery(query);
-    
-            while (resultSet.next()) {
-                String nomeBanco = resultSet.getString("datname");
-                bases.add(nomeBanco); 
+            try (var stmt = conexao.createStatement(); var rs = stmt.executeQuery(query)) {
+                while (rs.next()) {
+                    bases.add(rs.getString("datname"));
+                }
             }
-    
-            resultSet.close();
-            conexao.close();
-    
         } catch (SQLException e) {
             e.printStackTrace();
         }
-    
-        return bases; 
-        
+        return bases;
     }
 
-    public List<String> obterBanco(String base, String banco, String tipo) 
+    public List<String> obterBanco(String base, String banco, TipoConexao  tipo) 
     {
         // List<String> databases = listarBases(tipo, base);
         List<String> databases = listarBases( base, tipo);
@@ -266,6 +246,11 @@ public class DatabaseService
         
         return null;
 
+    }
+
+    public List<String> obterBanco(String base, String banco, String string) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'obterBanco'");
     }
    
 

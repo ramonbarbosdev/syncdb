@@ -7,6 +7,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.syncdb.controller.TipoConexao;
+
 @Service
 public class SincronizacaoService
 {
@@ -15,7 +17,7 @@ public class SincronizacaoService
 
     public  StringBuilder obterEstruturaTabela(String base, String banco )
     {
-        List<String> tabelas = databaseService.obterBanco(base,  banco,"cloud"  );
+        List<String> tabelas = databaseService.obterBanco(base,  banco,TipoConexao.CLOUD );
         // List<String> tabelas = databaseService.obterBanco( base,  banco , "cloud");
         StringBuilder estuturaTabela = new StringBuilder();
 
