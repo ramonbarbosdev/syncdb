@@ -53,17 +53,18 @@ public class SincronizacaoController
 	// }
 	
     @GetMapping(value = "/base/{base}", produces = "application/json")
-	public ResponseEntity<?> listarTabelas ( @PathVariable (value = "base") String base ) 
+	public ResponseEntity<?> sincronizacaoTotal ( @PathVariable (value = "base") String base ) 
 	{
 		String banco = "";
-		 sincronizacaoService.executarCriacaoTabela(base, banco);
+		
+		sincronizacaoService.executarSincronizacaoTotal(base, banco);
 
 		// if(lista.isEmpty())
 		// {
 	    //     return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
 		// }
 	
-			return ResponseEntity.status(HttpStatus.OK).body("{\"mensagem\": \"Retorno Base\"}");
+		return ResponseEntity.status(HttpStatus.OK).body("{\"mensagem\": \"Retorno Base\"}");
 
 
 	}

@@ -142,11 +142,13 @@ public class DatabaseService
        
         return false; 
     }
-    public String obterEstruturaTabela(Connection conexao, String nomeTabela) throws SQLException
+    public String criarEstuturaTabela(Connection conexao, String nomeTabela) throws SQLException
     {
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
         
+        System.out.println("Criando a tabela: " + nomeTabela);
+
         createTableScript.append("CREATE TABLE ").append(nomeTabela).append(" (\n");
     
         DatabaseMetaData metaData = conexao.getMetaData();
@@ -154,7 +156,8 @@ public class DatabaseService
     
         Set<String> primaryKeyColumns = new HashSet<>();
     
-        while (resultadoQuery.next()) {
+        while (resultadoQuery.next())
+        {
             String nomeColuna = resultadoQuery.getString("COLUMN_NAME").trim();
             String tipoColuna = resultadoQuery.getString("TYPE_NAME").trim();
             String nullable = resultadoQuery.getString("NULLABLE");
@@ -164,18 +167,21 @@ public class DatabaseService
                              .append(nomeColuna).append(" ")
                              .append(tipoColuna);
     
-            if ("0".equals(nullable)) {
+            if ("0".equals(nullable))
+            {
                 createTableScript.append(" NOT NULL");
             }
     
-            if (defaultColuna != null && !defaultColuna.isEmpty()) {
-                if (!defaultColuna.toLowerCase().contains("uuid_generate_v4()") || !needsUuidOssp) {
+            if (defaultColuna != null && !defaultColuna.isEmpty())
+            {
+                if (!defaultColuna.toLowerCase().contains("uuid_generate_v4()") || !needsUuidOssp)
+                {
                     if (defaultColuna.toLowerCase().contains("uuid_generate_v4()")) {
                         needsUuidOssp = true;
                     }
                     else if (!tipoColuna.equalsIgnoreCase("serial"))
                     {
-                    //adicionar a criarSequenciaQuery aqui
+                       
                     }
                 }
             }
@@ -186,36 +192,38 @@ public class DatabaseService
     
         resultadoQuery.close();
     
-        // Obter chaves primárias
-        try (ResultSet pkResultSet = metaData.getPrimaryKeys(null, "public", nomeTabela)) {
-            while (pkResultSet.next()) {
+        try (ResultSet pkResultSet = metaData.getPrimaryKeys(null, "public", nomeTabela))
+        {
+            while (pkResultSet.next())
+            {
                 String pkColumnName = pkResultSet.getString("COLUMN_NAME");
                 primaryKeyColumns.add(pkColumnName);
             }
         }
     
-        // Adiciona a chave primária ao script
-        if (!primaryKeyColumns.isEmpty()) {
+        if (!primaryKeyColumns.isEmpty())
+        {
             createTableScript.append("    PRIMARY KEY (")
                              .append(String.join(", ", primaryKeyColumns))
                              .append(")\n");
-        } else {
-            // Remove a última vírgula se não houver chave primária
+        }
+        else
+        {
             int lastCommaIndex = createTableScript.lastIndexOf(",");
-            if (lastCommaIndex != -1) {
+            if (lastCommaIndex != -1)
+            {
                 createTableScript.deleteCharAt(lastCommaIndex);
             }
         }
     
         createTableScript.append(");\n");
     
-        if (needsUuidOssp) {
+        if (needsUuidOssp)
+        {
             createTableScript.insert(0, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n");
         }
     
-        return createTableScript.toString();
-    
-    
+        return createTableScript.length() > 0 ?  createTableScript.toString() : null;
     
     }
 
@@ -452,7 +460,7 @@ public class DatabaseService
     }
 
     public TableMetadata obterTodosMetadados(Connection conexao, String nomeTabela) throws SQLException {
-        String estrutura = obterEstruturaTabela(conexao, nomeTabela);
+        String estrutura = criarEstuturaTabela(conexao, nomeTabela);
         String chaves = obterChaveEstrangeira(conexao, nomeTabela);
         return new TableMetadata(estrutura, chaves);
     }
