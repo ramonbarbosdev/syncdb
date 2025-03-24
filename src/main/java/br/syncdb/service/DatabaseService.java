@@ -217,7 +217,7 @@ public class DatabaseService
     }
 
 
-    public  String  criarSequenciaQuery(Connection conexao, String tabelaOrigem)  throws SQLException
+    public  String  criarSequenciaQuery(Connection conexao)  throws SQLException
     {
         StringBuilder createTableScript = new StringBuilder();
 
@@ -233,12 +233,41 @@ public class DatabaseService
                         "CREATE SEQUENCE IF NOT EXISTS %s START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;",
                         nomeSequenciaCloud);
 
-                    createTableScript.append(createSequenceQuery+"\n");
+                createTableScript.append(createSequenceQuery+"\n");
             }
         }
 
         return createTableScript.toString();
         
+    }
+
+    public  String  criarFuncoesQuery(Connection conexao)  throws SQLException
+    {
+
+        StringBuilder createTableScript = new StringBuilder();
+
+        String queryFuncoes = "SELECT n.nspname AS schema_name, p.proname AS function_name, pg_get_functiondef(p.oid) AS function_definition " +
+                                "FROM pg_proc p " +
+                                "JOIN pg_namespace n ON n.oid = p.pronamespace " +
+                                "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND pg_function_is_visible(p.oid);";
+
+        try (Statement stmtCloud = conexao.createStatement();
+        ResultSet rsCloud = stmtCloud.executeQuery(queryFuncoes))
+        {
+
+            while (rsCloud.next())
+            {
+                String nomeFuncaoCloud = rsCloud.getString("function_name");
+                String schemaCloud = rsCloud.getString("schema_name");
+                String functionDefinitionCloud = rsCloud.getString("function_definition");
+
+                String createFunctionQuery = "CREATE FUNCTION " + schemaCloud + "." + nomeFuncaoCloud + " " + functionDefinitionCloud;
+                
+                createTableScript.append(createFunctionQuery+"\n");
+            }
+        }
+
+        return createTableScript.toString();
     }
 
     private boolean sequenciaExiste(Connection conexao, String nomeSequencia) throws SQLException

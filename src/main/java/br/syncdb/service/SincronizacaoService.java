@@ -31,76 +31,110 @@ public class SincronizacaoService
 
     public void executarCriacaoTabela(String base, String banco)
     {
+        Connection conexaoCloud = null;
+        Connection conexaoLocal = null;
+        
         try
         {
-            Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-
-            Set<String> nomeTabelaCloud =  databaseService.obterTabelaMetaData( base, conexaoCloud);
-            Set<String> nomeTabelaLocal =  databaseService.obterTabelaMetaData( base, conexaoLocal);
-
-           
+            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            
+            // Obter dados das tabelas em paralelo (se possível)
+            Set<String> nomeTabelaCloud =  databaseService.obterTabelaMetaData(base, conexaoCloud);
+            Set<String> nomeTabelaLocal =  databaseService.obterTabelaMetaData(base, conexaoLocal);
+    
+            // Usando um StringBuilder para armazenar todas as queries de forma eficiente
             StringBuilder querySequencia = new StringBuilder();
+            StringBuilder queryFuncoes = new StringBuilder();
             StringBuilder queryCriacaoTabela = new StringBuilder();
             StringBuilder queryChaveSecundaria = new StringBuilder();
             StringBuilder queryAlteracoes = new StringBuilder();
+    
+            // Iniciar transação no banco local
+            conexaoLocal.setAutoCommit(false);
+    
             int contagemProcesso = 1;
-
+            
+            // Usar execução em batch para melhorar o desempenho
             for (String nomeTabela : nomeTabelaCloud)
             {
-                if (!nomeTabelaLocal.contains(nomeTabela))
-                {
-                    String criacaoSequncia = databaseService.criarSequenciaQuery(conexaoCloud,nomeTabela );
-                    String criacaoTabela = databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela);
-                    String chaveEstrangeira = databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela);
-                    
-                    querySequencia.append(criacaoSequncia.toString() );
-                    queryCriacaoTabela.append(criacaoTabela.toString() );
-                    queryChaveSecundaria.append(chaveEstrangeira.toString() );
-                   
+                try {
+                    if (!nomeTabelaLocal.contains(nomeTabela))
+                    {
+                        String criacaoSequencia = databaseService.criarSequenciaQuery(conexaoCloud);
+                        String criacaoTabela = databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela);
+                        String chaveEstrangeira = databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela);
+    
+                        // Acumular queries
+                        querySequencia.append(criacaoSequencia);
+                        queryCriacaoTabela.append(criacaoTabela);
+                        queryChaveSecundaria.append(chaveEstrangeira);
+                    }
+                    else
+                    {
+                        String criacaoFuncoes = databaseService.criarFuncoesQuery(conexaoCloud);
+                        queryFuncoes.append(criacaoFuncoes);
+    
+                        // Comparar e preparar alterações de estrutura de tabela
+                        String alteracoes = compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela);
+                        queryAlteracoes.append(alteracoes);
+                    }
+    
+                    contagemProcesso++;
+                    System.out.println(contagemProcesso + "/" + nomeTabelaCloud.size());
                 }
-                else
+                catch (SQLException ex)
                 {
-                  
-                    // 🏆 Tabela existe → comparar estrutura das colunas
-                    String alteracoes = compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela);
-                    queryAlteracoes.append(alteracoes);
+                    ex.printStackTrace();
+                    // Aguardar, ou salvar em log, se desejar, e continuar
                 }
-                contagemProcesso++;
-                System.out.println(contagemProcesso+"/"+nomeTabelaCloud.size());
-                
             }
-
-            try (Statement stmt = conexaoLocal.createStatement())
-            {
+    
+            // Executar todas as queries de forma otimizada
+            try (Statement stmt = conexaoLocal.createStatement()) {
+                // Executar as queries em batch
                 if (querySequencia.length() > 0)
                 {
-                    stmt.executeUpdate(querySequencia.toString());
-                    System.out.println("Sequencias criadas com sucesso.");
+                    stmt.addBatch(querySequencia.toString());
+                    System.out.println("Sequências preparadas.");
                 }
-                
+    
+                if (queryFuncoes.length() > 0)
+                {
+                    stmt.addBatch(queryFuncoes.toString());
+                    System.out.println("Funções preparadas.");
+                }
+    
                 if (queryCriacaoTabela.length() > 0)
                 {
-                    stmt.executeUpdate(queryCriacaoTabela.toString());
-                    System.out.println("Tabelas criadas com sucesso.");
+                    stmt.addBatch(queryCriacaoTabela.toString());
+                    System.out.println("Tabelas preparadas.");
                 }
-
-                if (queryAlteracoes.length() > 0) {
-                    stmt.executeUpdate(queryAlteracoes.toString());
-                    System.out.println("Estruturas das tabelas sincronizadas com sucesso.");
+    
+                if (queryAlteracoes.length() > 0)
+                {
+                    stmt.addBatch(queryAlteracoes.toString());
+                    System.out.println("Alterações preparadas.");
                 }
     
                 if (queryChaveSecundaria.length() > 0)
                 {
-                    stmt.executeUpdate(queryChaveSecundaria.toString());
-                    System.out.println("Chaves estrangeiras adicionadas com sucesso.");
+                    stmt.addBatch(queryChaveSecundaria.toString());
+                    System.out.println("Chaves estrangeiras preparadas.");
                 }
     
-               
+                // Executar o batch
+                stmt.executeBatch();
+                conexaoLocal.commit();
+                System.out.println("Processo concluído com sucesso.");
             }
-
+            catch (SQLException e)
+            {
+                conexaoLocal.rollback(); // Reverter em caso de erro
+                e.printStackTrace();
+            }
         }
-        catch (Exception e)
+        catch (SQLException e)
         {
             e.printStackTrace();
         }
@@ -108,8 +142,8 @@ public class SincronizacaoService
         {
             ConexaoBanco.fecharConexao(base);
         }
-              
     }
+    
     private String compararEstruturaTabela(Connection conexaoCloud, Connection conexaoLocal, String nomeTabela) throws SQLException {
         StringBuilder alteracoes = new StringBuilder();
     

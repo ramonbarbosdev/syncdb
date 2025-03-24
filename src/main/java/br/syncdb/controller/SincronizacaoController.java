@@ -63,7 +63,7 @@ public class SincronizacaoController
 	    //     return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
 		// }
 	
-		return ResponseEntity.status(HttpStatus.OK).body("{\"mensagem\": \"Retorno Base\"}");
+			return ResponseEntity.status(HttpStatus.OK).body("{\"mensagem\": \"Retorno Base\"}");
 
 
 	}
