@@ -38,7 +38,8 @@ public class SincronizacaoService
     @Autowired
     private DatabaseService databaseService;
 
-
+    //todo: implementar a o insert no momento que criar os scripts
+    
     public void executarSincronizacaoTotal(String base, String banco) {
         try {
             // Usar try-with-resources para garantir fechamento das conexões
