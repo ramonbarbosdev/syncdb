@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import br.syncdb.config.ConexaoBanco;
 import br.syncdb.config.DatabaseConnection;
 import br.syncdb.controller.TipoConexao;
+import br.syncdb.model.TableMetadata;
 
 
 @Service
@@ -217,23 +218,32 @@ public class DatabaseService
     }
 
 
-    public  String  criarSequenciaQuery(Connection conexao)  throws SQLException
+    public  String  criarSequenciaQuery(Connection conexaoCloud, Connection conexaoLocal)  throws SQLException
     {
         StringBuilder createTableScript = new StringBuilder();
 
         String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public';";  // Ajuste o esquema, se necessário
-        try (Statement stmtCloud = conexao.createStatement();
+        try (Statement stmtCloud = conexaoCloud.createStatement();
              ResultSet rsCloud = stmtCloud.executeQuery(querySequencias)) {
     
             while (rsCloud.next())
             {
                 String nomeSequenciaCloud = rsCloud.getString("sequencename");
     
-                String createSequenceQuery = String.format(
+               
+
+                if (!sequenciaExiste(conexaoLocal, nomeSequenciaCloud))
+                {
+                    String createSequenceQuery = String.format(
                         "CREATE SEQUENCE IF NOT EXISTS %s START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;",
                         nomeSequenciaCloud);
+                    createTableScript.append(createSequenceQuery+"\n");
+                }
+                else
+                {
+                    // System.out.println(nomeSequenciaCloud+" já existe.");
+                }
 
-                createTableScript.append(createSequenceQuery+"\n");
             }
         }
 
@@ -241,7 +251,20 @@ public class DatabaseService
         
     }
 
-    public  String  criarFuncoesQuery(Connection conexao)  throws SQLException
+    private boolean sequenciaExiste(Connection conexao, String nomeSequencia) throws SQLException {
+        String query = "SELECT COUNT(*) FROM pg_class WHERE relname = ? AND relkind = 'S'"; // 'S' para sequência
+        try (PreparedStatement stmt = conexao.prepareStatement(query)) {
+            stmt.setString(1, nomeSequencia.trim().toLowerCase());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        return false;
+    }
+
+    public  String  criarFuncoesQuery(Connection conexao,  Connection conexaoLocal)  throws SQLException
     {
 
         StringBuilder createTableScript = new StringBuilder();
@@ -261,20 +284,29 @@ public class DatabaseService
                 String schemaCloud = rsCloud.getString("schema_name");
                 String functionDefinitionCloud = rsCloud.getString("function_definition");
 
-                String createFunctionQuery = "CREATE FUNCTION " + schemaCloud + "." + nomeFuncaoCloud + " " + functionDefinitionCloud;
                 
-                createTableScript.append(createFunctionQuery+"\n");
+                if (!funcaoExiste(conexaoLocal, schemaCloud, nomeFuncaoCloud)) {
+                    String createFunctionQuery = "CREATE FUNCTION " + schemaCloud + "." + nomeFuncaoCloud + " " + functionDefinitionCloud;
+                    createTableScript.append(createFunctionQuery).append("\n");
+                }
             }
         }
 
         return createTableScript.toString();
     }
 
-    private boolean sequenciaExiste(Connection conexao, String nomeSequencia) throws SQLException
-    {
-        String query = "SELECT COUNT(*) FROM pg_class WHERE relname = ?";
+    private boolean funcaoExiste(Connection conexao, String schema, String nomeFuncao) throws SQLException {
+        String query = """
+                SELECT COUNT(*) 
+                FROM pg_proc p 
+                JOIN pg_namespace n ON n.oid = p.pronamespace 
+                WHERE n.nspname = ? AND p.proname = ?;
+                """;
+    
         try (PreparedStatement stmt = conexao.prepareStatement(query)) {
-            stmt.setString(1, nomeSequencia);
+            stmt.setString(1, schema.trim().toLowerCase());
+            stmt.setString(2, nomeFuncao.trim().toLowerCase());
+    
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1) > 0;
@@ -283,6 +315,7 @@ public class DatabaseService
         }
         return false;
     }
+
 
     public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException {
         StringBuilder createForeignKeyScript = new StringBuilder();
@@ -419,6 +452,10 @@ public class DatabaseService
         }
     }
 
-
+    public TableMetadata obterTodosMetadados(Connection conexao, String nomeTabela) throws SQLException {
+        String estrutura = obterEstruturaTabela(conexao, nomeTabela);
+        String chaves = obterChaveEstrangeira(conexao, nomeTabela);
+        return new TableMetadata(estrutura, chaves);
+    }
     
 }

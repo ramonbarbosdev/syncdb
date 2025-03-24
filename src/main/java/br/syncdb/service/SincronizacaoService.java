@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.Map.Entry;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,120 +29,150 @@ public class SincronizacaoService
     private DatabaseService databaseService;
 
 
+    public void executarCriacaoTabela(String base, String banco) {
+        try {
+            // Usar try-with-resources para garantir fechamento das conexões
+            try (Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+                Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL)) {
+                
+                // Obter metadados em paralelo
+                CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync(() -> 
+                    databaseService.obterTabelaMetaData(base, conexaoCloud));
+                CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync(() -> 
+                    databaseService.obterTabelaMetaData(base, conexaoLocal));
+                
+                Set<String> nomeTabelaCloud = futureCloud.join();
+                Set<String> nomeTabelaLocal = futureLocal.join();
+                
+                // Processamento paralelo das tabelas
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 
-    public void executarCriacaoTabela(String base, String banco)
-    {
-        Connection conexaoCloud = null;
-        Connection conexaoLocal = null;
-        
+    
+    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal, 
+        Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal) throws SQLException {
+        // Usar listas separadas para cada tipo de operação
+        List<String> sequencias = new ArrayList<>();
+        List<String> funcoes = new ArrayList<>();
+        List<String> criacoesTabela = new ArrayList<>();
+        List<String> chavesEstrangeiras = new ArrayList<>();
+        List<String> alteracoes = new ArrayList<>();
+
+            
+        synchronized (sequencias)
+        {
+            sequencias.add(databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal));
+        }
+
+        synchronized (funcoes)
+        {
+            // funcoes.add(databaseService.criarFuncoesQuery(conexaoCloud,conexaoLocal));
+        }
+
+        // Processamento paralelo das tabelas
+        nomeTabelaCloud.parallelStream().forEach(nomeTabela -> {
         try
         {
-            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-            
-            // Obter dados das tabelas em paralelo (se possível)
-            Set<String> nomeTabelaCloud =  databaseService.obterTabelaMetaData(base, conexaoCloud);
-            Set<String> nomeTabelaLocal =  databaseService.obterTabelaMetaData(base, conexaoLocal);
-    
-            // Usando um StringBuilder para armazenar todas as queries de forma eficiente
-            StringBuilder querySequencia = new StringBuilder();
-            StringBuilder queryFuncoes = new StringBuilder();
-            StringBuilder queryCriacaoTabela = new StringBuilder();
-            StringBuilder queryChaveSecundaria = new StringBuilder();
-            StringBuilder queryAlteracoes = new StringBuilder();
-    
-            // Iniciar transação no banco local
-            conexaoLocal.setAutoCommit(false);
-    
-            int contagemProcesso = 1;
-            
-            // Usar execução em batch para melhorar o desempenho
-            for (String nomeTabela : nomeTabelaCloud)
+            if (!nomeTabelaLocal.contains(nomeTabela))
             {
-                try {
-                    if (!nomeTabelaLocal.contains(nomeTabela))
-                    {
-                        String criacaoSequencia = databaseService.criarSequenciaQuery(conexaoCloud);
-                        String criacaoTabela = databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela);
-                        String chaveEstrangeira = databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela);
-    
-                        // Acumular queries
-                        querySequencia.append(criacaoSequencia);
-                        queryCriacaoTabela.append(criacaoTabela);
-                        queryChaveSecundaria.append(chaveEstrangeira);
-                    }
-                    else
-                    {
-                        String criacaoFuncoes = databaseService.criarFuncoesQuery(conexaoCloud);
-                        queryFuncoes.append(criacaoFuncoes);
-    
-                        // Comparar e preparar alterações de estrutura de tabela
-                        String alteracoes = compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela);
-                        queryAlteracoes.append(alteracoes);
-                    }
-    
-                    contagemProcesso++;
-                    System.out.println(contagemProcesso + "/" + nomeTabelaCloud.size());
+                
+                synchronized (criacoesTabela) {
+                    criacoesTabela.add(databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela));
                 }
-                catch (SQLException ex)
-                {
-                    ex.printStackTrace();
-                    // Aguardar, ou salvar em log, se desejar, e continuar
+                synchronized (chavesEstrangeiras) {
+                    chavesEstrangeiras.add(databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela));
                 }
             }
-    
-            // Executar todas as queries de forma otimizada
-            try (Statement stmt = conexaoLocal.createStatement()) {
-                // Executar as queries em batch
-                if (querySequencia.length() > 0)
-                {
-                    stmt.addBatch(querySequencia.toString());
-                    System.out.println("Sequências preparadas.");
-                }
-    
-                if (queryFuncoes.length() > 0)
-                {
-                    stmt.addBatch(queryFuncoes.toString());
-                    System.out.println("Funções preparadas.");
-                }
-    
-                if (queryCriacaoTabela.length() > 0)
-                {
-                    stmt.addBatch(queryCriacaoTabela.toString());
-                    System.out.println("Tabelas preparadas.");
-                }
-    
-                if (queryAlteracoes.length() > 0)
-                {
-                    stmt.addBatch(queryAlteracoes.toString());
-                    System.out.println("Alterações preparadas.");
-                }
-    
-                if (queryChaveSecundaria.length() > 0)
-                {
-                    stmt.addBatch(queryChaveSecundaria.toString());
-                    System.out.println("Chaves estrangeiras preparadas.");
-                }
-    
-                // Executar o batch
-                stmt.executeBatch();
-                conexaoLocal.commit();
-                System.out.println("Processo concluído com sucesso.");
-            }
-            catch (SQLException e)
+            else
             {
-                conexaoLocal.rollback(); // Reverter em caso de erro
-                e.printStackTrace();
+                
+                synchronized (alteracoes) {
+                    alteracoes.add(compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela));
+                }
             }
+        } catch (SQLException ex) {
+        ex.printStackTrace();
+        }
+        });
+
+        // Executar em batch
+        executarBatch(conexaoLocal, sequencias, funcoes, criacoesTabela, chavesEstrangeiras, alteracoes);
+    }
+
+                
+    private void executarBatch(Connection conexaoLocal, List<String> sequencias, 
+        List<String> funcoes, List<String> criacoesTabela,
+        List<String> chavesEstrangeiras, List<String> alteracoes) throws SQLException
+        {
+        conexaoLocal.setAutoCommit(false);
+
+        try (Statement stmt = conexaoLocal.createStatement())
+        {
+            // Executar cada tipo de operação em lotes menores
+            executarLotes(stmt, sequencias, "Sequências");
+            executarLotes(stmt, funcoes, "Funções");
+            executarLotes(stmt, criacoesTabela, "Criação de Tabelas");
+            executarLotes(stmt, alteracoes, "Alterações");
+            executarLotes(stmt, chavesEstrangeiras, "Chaves Estrangeiras");
+
+            conexaoLocal.commit();
         }
         catch (SQLException e)
         {
-            e.printStackTrace();
+            conexaoLocal.rollback();
+            throw e;
         }
-        finally
-        {
-            ConexaoBanco.fecharConexao(base);
+    }
+
+    private void executarLotes(Statement stmt, List<String> queries, String tipo) throws SQLException {
+        if (queries.isEmpty()) {
+            System.out.printf("[%s] Nenhuma query para executar.%n", tipo);
+            return;
         }
+    
+        final int batchSize = 100; // Tamanho do lote ajustável
+        final int totalQueries = queries.size();
+        int count = 0;
+        long startTime = System.currentTimeMillis();
+    
+        System.out.printf("[%s] Iniciando execução de %d queries...%n", tipo, totalQueries);
+    
+        for (String query : queries) {
+            stmt.addBatch(query);
+            count++;
+    
+            if (count % batchSize == 0) {
+                stmt.executeBatch();
+                printProgress(tipo, count, totalQueries, startTime);
+            }
+        }
+    
+        // Executar o restante
+        if (count % batchSize != 0) {
+            stmt.executeBatch();
+            printProgress(tipo, count, totalQueries, startTime);
+        }
+    
+        long endTime = System.currentTimeMillis();
+        System.out.printf("[%s] Concluído! %d queries executadas em %.2f segundos.%n", 
+                         tipo, totalQueries, (endTime - startTime) / 1000.0);
+    }
+    
+    private void printProgress(String tipo, int processed, int total, long startTime) {
+        double percentage = (processed * 100.0) / total;
+        long currentTime = System.currentTimeMillis();
+        double elapsedSec = (currentTime - startTime) / 1000.0;
+        
+        // Estimativa de tempo restante
+        double estimatedTotalSec = elapsedSec * total / processed;
+        double remainingSec = estimatedTotalSec - elapsedSec;
+        
+        System.out.printf("[%s] Progresso: %d/%d (%.2f%%) | Tempo: %.2fs | Restante: ~%.2fs%n",
+                         tipo, processed, total, percentage, elapsedSec, remainingSec);
     }
     
     private String compararEstruturaTabela(Connection conexaoCloud, Connection conexaoLocal, String nomeTabela) throws SQLException {
