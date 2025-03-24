@@ -139,7 +139,8 @@ public class DatabaseService
        
         return false; 
     }
-    public String obterEstruturaTabela(Connection conexao, String nomeTabela) throws SQLException {
+    public String obterEstruturaTabela(Connection conexao, String nomeTabela) throws SQLException
+    {
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
         
@@ -169,7 +170,10 @@ public class DatabaseService
                     if (defaultColuna.toLowerCase().contains("uuid_generate_v4()")) {
                         needsUuidOssp = true;
                     }
-                    // createTableScript.append(" DEFAULT ").append(defaultColuna);
+                    else if (!tipoColuna.equalsIgnoreCase("serial"))
+                    {
+                    //adicionar a criarSequenciaQuery aqui
+                    }
                 }
             }
     
@@ -207,6 +211,48 @@ public class DatabaseService
         }
     
         return createTableScript.toString();
+    
+    
+    
+    }
+
+
+    public  String  criarSequenciaQuery(Connection conexao, String tabelaOrigem)  throws SQLException
+    {
+        StringBuilder createTableScript = new StringBuilder();
+
+        String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public';";  // Ajuste o esquema, se necessário
+        try (Statement stmtCloud = conexao.createStatement();
+             ResultSet rsCloud = stmtCloud.executeQuery(querySequencias)) {
+    
+            while (rsCloud.next())
+            {
+                String nomeSequenciaCloud = rsCloud.getString("sequencename");
+    
+                String createSequenceQuery = String.format(
+                        "CREATE SEQUENCE IF NOT EXISTS %s START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;",
+                        nomeSequenciaCloud);
+
+                    createTableScript.append(createSequenceQuery+"\n");
+            }
+        }
+
+        return createTableScript.toString();
+        
+    }
+
+    private boolean sequenciaExiste(Connection conexao, String nomeSequencia) throws SQLException
+    {
+        String query = "SELECT COUNT(*) FROM pg_class WHERE relname = ?";
+        try (PreparedStatement stmt = conexao.prepareStatement(query)) {
+            stmt.setString(1, nomeSequencia);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        return false;
     }
 
     public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException {
@@ -224,7 +270,7 @@ public class DatabaseService
             if (constraintName != null && columnName != null && foreignTableName != null && foreignColumnName != null) {
 
                 constraintName = constraintName.replace("-", "_");
-                
+
                 createForeignKeyScript.append("ALTER TABLE ").append(nomeTabela)
                                       .append(" ADD CONSTRAINT ").append(constraintName)
                                       .append(" FOREIGN KEY (").append(columnName).append(")")
@@ -243,46 +289,107 @@ public class DatabaseService
     
     
    public String obterIndices(Connection conexao, String nomeTabela) throws SQLException {
-    StringBuilder createIndexScript = new StringBuilder();
-    DatabaseMetaData metaData = conexao.getMetaData();
+        StringBuilder createIndexScript = new StringBuilder();
+        DatabaseMetaData metaData = conexao.getMetaData();
 
-    Map<String, List<String>> indices = new HashMap<>();
+        Map<String, List<String>> indices = new HashMap<>();
 
-    ResultSet indexResultSet = metaData.getIndexInfo(null, "public", nomeTabela, false, false);
+        ResultSet indexResultSet = metaData.getIndexInfo(null, "public", nomeTabela, false, false);
 
-    while (indexResultSet.next()) {
-        String indexName = indexResultSet.getString("INDEX_NAME");
-        String columnName = indexResultSet.getString("COLUMN_NAME");
-        boolean nonUnique = indexResultSet.getBoolean("NON_UNIQUE");
+        while (indexResultSet.next()) {
+            String indexName = indexResultSet.getString("INDEX_NAME");
+            String columnName = indexResultSet.getString("COLUMN_NAME");
+            boolean nonUnique = indexResultSet.getBoolean("NON_UNIQUE");
 
-        if (indexName != null && columnName != null) {
-            indices.computeIfAbsent(indexName, k -> new ArrayList<>()).add(columnName);
-            indices.put(indexName + "_type", List.of(nonUnique ? "INDEX" : "UNIQUE INDEX"));
+            if (indexName != null && columnName != null) {
+                indices.computeIfAbsent(indexName, k -> new ArrayList<>()).add(columnName);
+                indices.put(indexName + "_type", List.of(nonUnique ? "INDEX" : "UNIQUE INDEX"));
+            }
+        }
+
+        for (String indexName : indices.keySet()) {
+            if (!indexName.endsWith("_type")) {
+                String indexType = indices.get(indexName + "_type").get(0);
+                StringJoiner columns = new StringJoiner(", ");
+                indices.get(indexName).forEach(columns::add);
+
+                createIndexScript.append("CREATE ")
+                                .append(indexType)
+                                .append(" ").append(indexName)
+                                .append(" ON ").append(nomeTabela)
+                                .append(" (").append(columns).append(");\n");
+            }
+        }
+
+        indexResultSet.close();
+
+        if (createIndexScript.length() == 0) {
+            return "-- Nenhum índice encontrado para a tabela " + nomeTabela + ".\n";
+        }
+
+        return createIndexScript.toString();
+    }
+
+    public  Set<String>  obterTabelaMetaData(String base, Connection conexao)
+    {
+        try
+        {
+            if( conexao == null)
+            {
+                return null;
+            }
+
+            DatabaseMetaData conexaoMetaData = conexao.getMetaData();
+            ResultSet tabelas = conexaoMetaData.getTables(null, null, "%", new String[] {"TABLE"});
+            
+            Set<String> nomeTabelas = new HashSet<>();
+            while (tabelas.next())
+            {
+                nomeTabelas.add(tabelas.getString("TABLE_NAME"));
+            }
+
+            return nomeTabelas;
+        }
+        catch (SQLException e)
+        {
+            throw new RuntimeException(e);
+        }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
         }
     }
 
-    for (String indexName : indices.keySet()) {
-        if (!indexName.endsWith("_type")) {
-            String indexType = indices.get(indexName + "_type").get(0);
-            StringJoiner columns = new StringJoiner(", ");
-            indices.get(indexName).forEach(columns::add);
+    public  Set<String>  obterColunaMetaData(String base, Connection conexao, String nomeTabela)
+    {
+        try
+        {
+            if( conexao == null)
+            {
+                return null;
+            }
 
-            createIndexScript.append("CREATE ")
-                             .append(indexType)
-                             .append(" ").append(indexName)
-                             .append(" ON ").append(nomeTabela)
-                             .append(" (").append(columns).append(");\n");
+            DatabaseMetaData conexaoMetaData = conexao.getMetaData();
+            ResultSet colunas = conexaoMetaData.getColumns(null, null, nomeTabela, null);
+            
+            Set<String> nomeColunas = new HashSet<>();
+            
+            while (colunas.next()) {
+                nomeColunas.add(colunas.getString("COLUMN_NAME"));
+            }
+
+            return nomeColunas;
+        }
+        catch (SQLException e)
+        {
+            throw new RuntimeException(e);
+        }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
         }
     }
 
-    indexResultSet.close();
-
-    if (createIndexScript.length() == 0) {
-        return "-- Nenhum índice encontrado para a tabela " + nomeTabela + ".\n";
-    }
-
-    return createIndexScript.toString();
-}
 
     
 }
