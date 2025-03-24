@@ -1,6 +1,7 @@
 package br.syncdb.service;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -133,136 +134,135 @@ public class DatabaseService
        
         return false; 
     }
-
-    public static String criarCriacaoTabelaQuery( Connection conexao ,String tabelaOrigem)
+    public String obterEstruturaTabela(Connection conexao, String nomeTabela) throws SQLException {
+        StringBuilder createTableScript = new StringBuilder();
+        boolean needsUuidOssp = false; // Flag para verificar se a extensão é necessária
+    
+        createTableScript.append("CREATE TABLE " + nomeTabela + " (\n");
+    
+        // Obter DatabaseMetaData
+        DatabaseMetaData metaData = conexao.getMetaData();
+        ResultSet resultadoQuery = metaData.getColumns(null, "public", nomeTabela, null);
+    
+        while (resultadoQuery.next()) {
+            String nomeColuna = resultadoQuery.getString("COLUMN_NAME").trim();
+            String tipoColuna = resultadoQuery.getString("TYPE_NAME").trim();
+            String nullable = resultadoQuery.getString("NULLABLE").trim();
+            String defaultColuna = resultadoQuery.getString("COLUMN_DEF");
+    
+            createTableScript.append("    ")
+                    .append(nomeColuna).append(" ")
+                    .append(tipoColuna);
+    
+            if ("0".equals(nullable)) { // 0 significa NOT NULL
+                createTableScript.append(" NOT NULL");
+            }
+    
+            // Verifica se a coluna usa uuid_generate_v4() como valor padrão
+            if (defaultColuna != null && !defaultColuna.isEmpty() && defaultColuna.toLowerCase().contains("uuid_generate_v4()")) {
+                needsUuidOssp = true; 
+            }
+    
+            // if (defaultColuna != null && !defaultColuna.isEmpty() && !tipoColuna.equalsIgnoreCase("serial")) {
+            //     createTableScript.append(" DEFAULT ").append(defaultColuna);
+            // }
+    
+            createTableScript.append(",\n");
+        }
+    
+        if (createTableScript.length() > 2) {
+            createTableScript.setLength(createTableScript.length() - 2); // Remove a última vírgula
+        }
+    
+        createTableScript.append("\n);\n");
+    
+        // Se a extensão for necessária, adiciona a criação da extensão no início do script
+        if (needsUuidOssp) {
+            createTableScript.insert(0, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n");
+        }
+    
+        return createTableScript.toString();
+    }
+    
+    // public static String criarSequenciaQuery(Connection conexao, String tabelaOrigem) {
+    //     try {
+    //         DatabaseMetaData metaData = conexao.getMetaData();
+    //         ResultSet resultadoQuery = metaData.getColumns(null, "public", tabelaOrigem, null);
+    
+    //         // Criar sequência
+    //         StringBuilder createSequenceQuery = new StringBuilder();
+    
+    //         while (resultadoQuery.next()) {
+    //             String nomeColunaSeq = resultadoQuery.getString("COLUMN_NAME");
+    //             String columnDefault = resultadoQuery.getString("COLUMN_DEF");
+    //             String tipoColuna = resultadoQuery.getString("TYPE_NAME");
+    
+    //             // Verifica se a coluna tem uma sequência associada e não é do tipo serial
+    //             if (columnDefault != null && columnDefault.toLowerCase().contains("nextval") && !tipoColuna.equalsIgnoreCase("serial")) {
+    //                 createSequenceQuery.append("CREATE SEQUENCE IF NOT EXISTS ")
+    //                         .append(tabelaOrigem).append("_").append(nomeColunaSeq).append("_seq ")
+    //                         .append("START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1; ");
+    //             }
+    //         }
+    
+    //         return createSequenceQuery.toString();
+    
+    //     } catch (SQLException e) {
+    //         e.printStackTrace();
+    //     }
+    //     return "";
+    // }
+    public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException
     {
         StringBuilder createTableScript = new StringBuilder();
 
-        String scriptSequencia = criarSequenciaQuery( conexao,  tabelaOrigem);
-
-        createTableScript.append(scriptSequencia+ "\n");
-
-        createTableScript.append("CREATE TABLE " + tabelaOrigem + " (\n");
-
-        try 
-        {
-
-            String query = "SELECT column_name, data_type, is_nullable, column_default " +
-                           "FROM information_schema.columns " +
-                           "WHERE table_name = '" + tabelaOrigem + "' " +
-                           "AND table_schema = 'public';";
-
-            var stmt = conexao.createStatement();
-            var resultadoQuery = stmt.executeQuery(query);
-
-            while (resultadoQuery.next()) {
-                String nomeColuna = resultadoQuery.getString("column_name").trim();
-                String tipoColuna = resultadoQuery.getString("data_type").trim();
-                String nullable = resultadoQuery.getString("is_nullable").trim();
-                String defaultColuna = resultadoQuery.getString("column_default");
-            
-                createTableScript.append("    ")
-                        .append(nomeColuna).append(" ")
-                        .append(tipoColuna);
-            
-                if ("NO".equalsIgnoreCase(nullable)) {
-                    createTableScript.append(" NOT NULL");
-                }
-            
-                if (defaultColuna != null && !defaultColuna.isEmpty()) {
-                   
-                    createTableScript.append(" DEFAULT ").append(defaultColuna);
-                }
-            
-                createTableScript.append(",\n");
-  
-            }
-
-            if (createTableScript.length() > 2) {
-                createTableScript.setLength(createTableScript.length() - 2); 
-            }
-
-            createTableScript.append("\n);\n");
-
-       
-
-            //  chaves estrangeiras
-            String foreignKeyQuery = "SELECT tc.constraint_name, kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name " +
+        String foreignKeyQuery = "SELECT tc.constraint_name, kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name " +
                                       "FROM information_schema.table_constraints AS tc " +
                                       "JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name " +
                                       "JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name " +
-                                      "WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = '" + tabelaOrigem + "';";
+                                      "WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = '" + nomeTabela + "';";
 
 
 
-            stmt = conexao.createStatement();
+            var stmt = conexao.createStatement();
             var foreignKeyResultSet = stmt.executeQuery(foreignKeyQuery);
 
-            while (foreignKeyResultSet.next()) {
+            while (foreignKeyResultSet.next())
+            {
                 String constraintName = foreignKeyResultSet.getString("constraint_name");
                 String columnName = foreignKeyResultSet.getString("column_name");
                 String foreignTableName = foreignKeyResultSet.getString("foreign_table_name");
                 String foreignColumnName = foreignKeyResultSet.getString("foreign_column_name");
 
-                createTableScript.append("ALTER TABLE ").append(tabelaOrigem)
+                createTableScript.append("ALTER TABLE ").append(nomeTabela)
                                  .append(" ADD CONSTRAINT ").append(constraintName)
                                  .append(" FOREIGN KEY (").append(columnName)
                                  .append(") REFERENCES ").append(foreignTableName)
                                  .append("(").append(foreignColumnName).append(");\n");
             }
 
-            // Obter índices
-            String indexQuery = "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '" + tabelaOrigem + "';";
-
-            stmt = conexao.createStatement();
-            var indexResultSet = stmt.executeQuery(indexQuery);
-
-            while (indexResultSet.next()) {
-                String indexName = indexResultSet.getString("indexname");
-                String indexDef = indexResultSet.getString("indexdef");
-
-                createTableScript.append(indexDef).append(";\n");
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
+       
         return createTableScript.toString();
     }
-    public static String criarSequenciaQuery(Connection conexao, String tabelaOrigem) 
+    public String obterIndices(Connection conexao, String nomeTabela) throws SQLException
     {
-        try 
+        StringBuilder createTableScript = new StringBuilder();
+
+        String indexQuery = "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '" + nomeTabela + "';";
+
+        var stmt = conexao.createStatement();
+        var indexResultSet = stmt.executeQuery(indexQuery);
+
+        while (indexResultSet.next())
         {
-            String query = "  select column_name  FROM information_schema.columns  " 
-            + "WHERE table_name = '" + tabelaOrigem + "' " 
-            + " and column_default ilike '%nextval%' ";
+            String indexName = indexResultSet.getString("indexname");
+            String indexDef = indexResultSet.getString("indexdef");
 
-            var stmt = conexao.createStatement();
-            var resultadoQuery = stmt.executeQuery(query);
-
-            //criar sequencia 
-            StringBuilder createSequenceQuery = new StringBuilder();
-
-            while (resultadoQuery.next())
-            {
-                String nomeColunaSeq = resultadoQuery.getString("column_name");
-                createSequenceQuery.append("CREATE SEQUENCE IF NOT EXISTS ")
-                                .append(tabelaOrigem).append("_").append(nomeColunaSeq).append("_seq ")
-                                .append("START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1; ");
-            }
-
-            return createSequenceQuery.toString();
-
+            createTableScript.append(indexDef).append(";\n");
         }
-        catch (SQLException e)
-        {
-              e.printStackTrace();
-        }
-        return tabelaOrigem;
-        
+       
+        return createTableScript.toString();
     }
 
-
-
+    
 }

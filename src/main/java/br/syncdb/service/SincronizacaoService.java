@@ -31,18 +31,61 @@ public class SincronizacaoService
     {
         try
         {
-            //cloud
-            Set<String> nomeTabelaCloud =  obterMetaData( base,  TipoConexao.CLOUD);
-            Set<String> nomeTabelaLocal =  obterMetaData( base,  TipoConexao.LOCAL);
-           
+            Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
 
+            Set<String> nomeTabelaCloud =  obterMetaData( base, conexaoCloud);
+            Set<String> nomeTabelaLocal =  obterMetaData( base, conexaoLocal);
+
+           
+            StringBuilder queryCriacaoTabela = new StringBuilder();
+            StringBuilder queryChaveSecundaria = new StringBuilder();
+            StringBuilder queryIndices = new StringBuilder();
+            int contagemProcesso = 1;
             for (String nomeTabela : nomeTabelaCloud)
             {
                 if (!nomeTabelaLocal.contains(nomeTabela))
                 {
-                    System.out.println("Tabela " + nomeTabela + " não existe no banco local.");
-                    // Aqui você pode criar a tabela no banco local se necessário
+                    if(nomeTabela.contains("system_users"))
+                    {
+                        
+                    }
+                    String criacaoTabela = databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela);
+                    // String chaveEstrangeira = databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela);
+                    // String indices = databaseService.obterIndices(conexaoCloud, nomeTabela);
+                    
+                    queryCriacaoTabela.append(criacaoTabela.toString() );
+                    // queryChaveSecundaria.append(chaveEstrangeira.toString() );
+                    // queryIndices.append(indices.toString() );
+                    // var stmt = conexaoLocal.createStatement();
+                    // stmt.executeUpdate(estruturaTabela);
+                    System.out.println("Processo: " + contagemProcesso+"/"+nomeTabelaCloud.size());
+                    contagemProcesso++;
+                   
+                   
                 }
+                
+            }
+
+            try (Statement stmt = conexaoLocal.createStatement())
+            {
+                if (queryCriacaoTabela.length() > 0)
+                {
+                    stmt.executeUpdate(queryCriacaoTabela.toString());
+                    System.out.println("Tabelas criadas com sucesso.");
+                }
+    
+                // if (queryChaveSecundaria.length() > 0)
+                // {
+                //     stmt.executeUpdate(queryChaveSecundaria.toString());
+                //     System.out.println("Chaves estrangeiras adicionadas com sucesso.");
+                // }
+    
+                // if (queryIndices.length() > 0)
+                // {
+                //     stmt.executeUpdate(queryIndices.toString());
+                //     System.out.println("Índices adicionados com sucesso.");
+                // }
             }
 
         }
@@ -50,15 +93,18 @@ public class SincronizacaoService
         {
             e.printStackTrace();
         }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
+        }
               
     }
 
-    public  Set<String>  obterMetaData(String base, TipoConexao tipo)
+
+    public  Set<String>  obterMetaData(String base, Connection conexao)
     {
         try
         {
-            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
-
             if( conexao == null)
             {
                 return null;
@@ -83,36 +129,6 @@ public class SincronizacaoService
         {
             ConexaoBanco.fecharConexao(base);
         }
-    }
-
-    public Map<String, String> obterEstruturaTabela(String base, String banco)
-    {
-        List<String> tabelas = databaseService.obterBanco(base, banco, TipoConexao.CLOUD);
-        Map<String, String> estruturaTabela = new HashMap<>(); 
-
-        if (tabelas != null) {
-            try {
-                Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-
-                for (String tabela : tabelas)
-                {
-                    String scriptTabela = databaseService.criarCriacaoTabelaQuery(conexaoCloud, tabela);
-
-                    estruturaTabela.put(tabela, scriptTabela); 
-
-              
-                    break;
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-            finally
-            {
-                ConexaoBanco.fecharConexao(base);
-            }
-        }
-
-        return estruturaTabela; // Retorna o Map com as tabelas e suas consultas
     }
 
 }
