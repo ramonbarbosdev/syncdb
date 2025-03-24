@@ -65,7 +65,10 @@ public class SincronizacaoService
             
         synchronized (sequencias)
         {
-            sequencias.add(databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal));
+            if(databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal) != null)
+            {
+                sequencias.add(databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal));
+            }
         }
 
         synchronized (funcoes)
@@ -75,31 +78,36 @@ public class SincronizacaoService
 
         // Processamento paralelo das tabelas
         nomeTabelaCloud.parallelStream().forEach(nomeTabela -> {
-        try
-        {
-            if (!nomeTabelaLocal.contains(nomeTabela))
+            try
             {
-                
-                synchronized (criacoesTabela) {
-                    criacoesTabela.add(databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela));
+                if (!nomeTabelaLocal.contains(nomeTabela))
+                {
+                    synchronized (criacoesTabela) 
+                    {
+                        criacoesTabela.add(databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela));
+                    }
+                    synchronized (chavesEstrangeiras)
+                    {
+                        chavesEstrangeiras.add(databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela));
+                    }
                 }
-                synchronized (chavesEstrangeiras) {
-                    chavesEstrangeiras.add(databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela));
+                else
+                {
+                    synchronized (alteracoes)
+                    {
+                        if(databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela) != null)
+                        {
+                            alteracoes.add(databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela));
+                        }
+                    }
                 }
-            }
-            else
+            } catch (SQLException ex)
             {
-                
-                synchronized (alteracoes) {
-                    alteracoes.add(compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela));
-                }
+                ex.printStackTrace();
             }
-        } catch (SQLException ex) {
-        ex.printStackTrace();
-        }
         });
 
-        // Executar em batch
+ 
         executarBatch(conexaoLocal, sequencias, funcoes, criacoesTabela, chavesEstrangeiras, alteracoes);
     }
 
@@ -175,123 +183,7 @@ public class SincronizacaoService
                          tipo, processed, total, percentage, elapsedSec, remainingSec);
     }
     
-    private String compararEstruturaTabela(Connection conexaoCloud, Connection conexaoLocal, String nomeTabela) throws SQLException {
-        StringBuilder alteracoes = new StringBuilder();
-    
-        DatabaseMetaData metaDataCloud = conexaoCloud.getMetaData();
-        DatabaseMetaData metaDataLocal = conexaoLocal.getMetaData();
-    
-        // ✅ Obter colunas da tabela na origem (Cloud)
-        ResultSet colunasCloud = metaDataCloud.getColumns(null, "public", nomeTabela, null);
-        Map<String, Coluna> estruturaCloud = new HashMap<>();
-    
-        while (colunasCloud.next()) {
-            Coluna coluna = new Coluna();
-            coluna.setNome(colunasCloud.getString("COLUMN_NAME"));
-            coluna.setTipo(colunasCloud.getString("TYPE_NAME"));
-            coluna.setNullable(colunasCloud.getInt("NULLABLE") == DatabaseMetaData.columnNullable);
-            coluna.setDefaultValor(colunasCloud.getString("COLUMN_DEF"));
-    
-            estruturaCloud.put(coluna.getNome(), coluna);
-        }
-    
-        colunasCloud.close();
-    
-        // ✅ Obter colunas da tabela no destino (Local)
-        ResultSet colunasLocal = metaDataLocal.getColumns(null, "public", nomeTabela, null);
-        Map<String, Coluna> estruturaLocal = new HashMap<>();
-    
-        while (colunasLocal.next()) {
-            Coluna coluna = new Coluna();
-            coluna.setNome(colunasLocal.getString("COLUMN_NAME"));
-            coluna.setTipo(colunasLocal.getString("TYPE_NAME"));
-            coluna.setNullable(colunasLocal.getInt("NULLABLE") == DatabaseMetaData.columnNullable);
-            coluna.setDefaultValor(colunasLocal.getString("COLUMN_DEF"));
-    
-            estruturaLocal.put(coluna.getNome(), coluna);
-        }
-    
-        colunasLocal.close();
-    
-        // ✅ Adicionar novas colunas ou alterar colunas existentes
-        for (String nomeColuna : estruturaCloud.keySet()) {
-            Coluna colunaCloud = estruturaCloud.get(nomeColuna);
-            Coluna colunaLocal = estruturaLocal.get(nomeColuna);
-    
-            if (colunaLocal == null) {
-                // 🔥 Nova coluna → Adicionar ao destino
-                alteracoes.append("ALTER TABLE ")
-                          .append(nomeTabela)
-                          .append(" ADD COLUMN ")
-                          .append(colunaCloud.getNome()).append(" ")
-                          .append(colunaCloud.getTipo());
-    
-                if (!colunaCloud.isNullable()) {
-                    alteracoes.append(" NOT NULL");
-                }
-    
-                if (colunaCloud.getDefaultValor() != null) {
-                    alteracoes.append(" DEFAULT ").append(colunaCloud.getDefaultValor());
-                }
-    
-                alteracoes.append(";\n");
-            } else {
-                // 🚀 Coluna existe → Verificar diferenças
-                if (!colunaCloud.getTipo().equalsIgnoreCase(colunaLocal.getTipo())) {
-                    alteracoes.append("ALTER TABLE ")
-                              .append(nomeTabela)
-                              .append(" ALTER COLUMN ")
-                              .append(nomeColuna)
-                              .append(" TYPE ")
-                              .append(colunaCloud.getTipo())
-                              .append(";\n");
-                }
-    
-                if (colunaCloud.isNullable() != colunaLocal.isNullable()) {
-                    alteracoes.append("ALTER TABLE ")
-                              .append(nomeTabela)
-                              .append(" ALTER COLUMN ")
-                              .append(nomeColuna)
-                              .append(colunaCloud.isNullable() ? " DROP NOT NULL" : " SET NOT NULL")
-                              .append(";\n");
-                }
-    
-                if ((colunaCloud.getDefaultValor() == null && colunaLocal.getDefaultValor() != null) ||
-                    (colunaCloud.getDefaultValor() != null && !colunaCloud.getDefaultValor().equals(colunaLocal.getDefaultValor()))) {
-                    if (colunaCloud.getDefaultValor() == null) {
-                        alteracoes.append("ALTER TABLE ")
-                                  .append(nomeTabela)
-                                  .append(" ALTER COLUMN ")
-                                  .append(nomeColuna)
-                                  .append(" DROP DEFAULT")
-                                  .append(";\n");
-                    } else {
-                        alteracoes.append("ALTER TABLE ")
-                                  .append(nomeTabela)
-                                  .append(" ALTER COLUMN ")
-                                  .append(nomeColuna)
-                                  .append(" SET DEFAULT ")
-                                  .append(colunaCloud.getDefaultValor())
-                                  .append(";\n");
-                    }
-                }
-            }
-        }
-    
-        // ✅ Remover colunas que não existem mais
-        for (String nomeColuna : estruturaLocal.keySet()) {
-            if (!estruturaCloud.containsKey(nomeColuna)) {
-                alteracoes.append("ALTER TABLE ")
-                          .append(nomeTabela)
-                          .append(" DROP COLUMN ")
-                          .append(nomeColuna)
-                          .append(";\n");
-            }
-        }
-    
-        return alteracoes.toString();
-    }
-    
+ 
     
     // 🏆 Método para obter a estrutura de colunas
     

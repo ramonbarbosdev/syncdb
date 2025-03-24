@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import br.syncdb.config.ConexaoBanco;
 import br.syncdb.config.DatabaseConnection;
 import br.syncdb.controller.TipoConexao;
+import br.syncdb.model.Coluna;
 import br.syncdb.model.TableMetadata;
 
 
@@ -239,15 +241,12 @@ public class DatabaseService
                         nomeSequenciaCloud);
                     createTableScript.append(createSequenceQuery+"\n");
                 }
-                else
-                {
-                    // System.out.println(nomeSequenciaCloud+" já existe.");
-                }
+                
 
             }
         }
 
-        return createTableScript.toString();
+        return createTableScript.length() > 0 ?  createTableScript.toString() : null;
         
     }
 
@@ -458,4 +457,122 @@ public class DatabaseService
         return new TableMetadata(estrutura, chaves);
     }
     
+
+
+    /////////////////////////
+    public String compararEstruturaTabela(Connection conexaoCloud, Connection conexaoLocal, 
+            String nomeTabela) throws SQLException {
+        
+        StringBuilder alteracoes = new StringBuilder();
+        
+        System.out.println("Verificando alteracao na tabela: " + nomeTabela);
+
+        Map<String, Coluna> estruturaCloud = obterEstruturaColunas(conexaoCloud, nomeTabela);
+        Map<String, Coluna> estruturaLocal = obterEstruturaColunas(conexaoLocal, nomeTabela);
+        
+        compararColunas(alteracoes, nomeTabela, estruturaCloud, estruturaLocal);
+        compararColunasRemovidas(alteracoes, nomeTabela, estruturaCloud, estruturaLocal);
+        
+        return alteracoes.length() > 0 ?  alteracoes.toString() : null;
+    }
+
+    // Método auxiliar para obter estrutura de colunas
+    private Map<String, Coluna> obterEstruturaColunas(Connection conexao, String nomeTabela) 
+            throws SQLException {
+        
+        Map<String, Coluna> estrutura = new HashMap<>();
+        DatabaseMetaData metaData = conexao.getMetaData();
+        
+        try (ResultSet colunas = metaData.getColumns(null, "public", nomeTabela, null)) {
+            while (colunas.next()) {
+                Coluna coluna = new Coluna();
+                coluna.setNome(colunas.getString("COLUMN_NAME"));
+                coluna.setTipo(colunas.getString("TYPE_NAME"));
+                coluna.setNullable(colunas.getInt("NULLABLE") == DatabaseMetaData.columnNullable);
+                coluna.setDefaultValor(colunas.getString("COLUMN_DEF"));
+                
+                estrutura.put(coluna.getNome().toLowerCase(), coluna);
+            }
+        }
+        
+        return estrutura;
+    }
+
+    // Método auxiliar para comparar colunas existentes
+    private void compararColunas(StringBuilder alteracoes, String nomeTabela,
+            Map<String, Coluna> estruturaCloud, Map<String, Coluna> estruturaLocal) {
+        
+        estruturaCloud.forEach((nomeColuna, colunaCloud) -> {
+            Coluna colunaLocal = estruturaLocal.get(nomeColuna);
+            
+            if (colunaLocal == null) {
+                // Adicionar nova coluna
+                alteracoes.append(String.format(
+                    "ALTER TABLE %s ADD COLUMN %s %s%s%s;%n",
+                    nomeTabela,
+                    colunaCloud.getNome(),
+                    colunaCloud.getTipo(),
+                    colunaCloud.isNullable() ? "" : " NOT NULL",
+                    colunaCloud.getDefaultValor() != null ? 
+                        " DEFAULT " + colunaCloud.getDefaultValor() : ""
+                ));
+            } else {
+                // Verificar diferenças
+                compararTipoColuna(alteracoes, nomeTabela, nomeColuna, colunaCloud, colunaLocal);
+                compararNullableColuna(alteracoes, nomeTabela, nomeColuna, colunaCloud, colunaLocal);
+                compararDefaultColuna(alteracoes, nomeTabela, nomeColuna, colunaCloud, colunaLocal);
+            }
+        });
+    }
+
+    // Métodos específicos para cada tipo de comparação
+    private void compararTipoColuna(StringBuilder alteracoes, String nomeTabela, String nomeColuna,
+            Coluna cloud, Coluna local) {
+        if (!cloud.getTipo().equalsIgnoreCase(local.getTipo())) {
+            alteracoes.append(String.format(
+                "ALTER TABLE %s ALTER COLUMN %s TYPE %s;%n",
+                nomeTabela, nomeColuna, cloud.getTipo()
+            ));
+        }
+    }
+
+    private void compararNullableColuna(StringBuilder alteracoes, String nomeTabela, String nomeColuna,
+            Coluna cloud, Coluna local) {
+        if (cloud.isNullable() != local.isNullable()) {
+            alteracoes.append(String.format(
+                "ALTER TABLE %s ALTER COLUMN %s %s NOT NULL;%n",
+                nomeTabela, nomeColuna, cloud.isNullable() ? "DROP" : "SET"
+            ));
+        }
+    }
+
+    private void compararDefaultColuna(StringBuilder alteracoes, String nomeTabela, String nomeColuna,
+            Coluna cloud, Coluna local) {
+        if (!Objects.equals(cloud.getDefaultValor(), local.getDefaultValor())) {
+            if (cloud.getDefaultValor() == null) {
+                alteracoes.append(String.format(
+                    "ALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;%n",
+                    nomeTabela, nomeColuna
+                ));
+            } else {
+                alteracoes.append(String.format(
+                    "ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;%n",
+                    nomeTabela, nomeColuna, cloud.getDefaultValor()
+                ));
+            }
+        }
+    }
+
+    // Método auxiliar para colunas removidas
+    private void compararColunasRemovidas(StringBuilder alteracoes, String nomeTabela,
+            Map<String, Coluna> estruturaCloud, Map<String, Coluna> estruturaLocal) {
+        
+        estruturaLocal.keySet().stream()
+            .filter(nomeColuna -> !estruturaCloud.containsKey(nomeColuna))
+            .forEach(nomeColuna -> alteracoes.append(String.format(
+                "ALTER TABLE %s DROP COLUMN %s;%n",
+                nomeTabela, nomeColuna
+            )));
+    }
+
 }
