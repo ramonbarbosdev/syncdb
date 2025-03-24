@@ -40,29 +40,22 @@ public class SincronizacaoService
            
             StringBuilder queryCriacaoTabela = new StringBuilder();
             StringBuilder queryChaveSecundaria = new StringBuilder();
-            StringBuilder queryIndices = new StringBuilder();
             int contagemProcesso = 1;
+            
             for (String nomeTabela : nomeTabelaCloud)
             {
                 if (!nomeTabelaLocal.contains(nomeTabela))
                 {
-                    if(nomeTabela.contains("system_users"))
-                    {
-                        
-                    }
+                   
                     String criacaoTabela = databaseService.obterEstruturaTabela(conexaoCloud, nomeTabela);
-                    // String chaveEstrangeira = databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela);
-                    // String indices = databaseService.obterIndices(conexaoCloud, nomeTabela);
+                    String chaveEstrangeira = databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela);
                     
                     queryCriacaoTabela.append(criacaoTabela.toString() );
-                    // queryChaveSecundaria.append(chaveEstrangeira.toString() );
-                    // queryIndices.append(indices.toString() );
-                    // var stmt = conexaoLocal.createStatement();
-                    // stmt.executeUpdate(estruturaTabela);
+                    queryChaveSecundaria.append(chaveEstrangeira.toString() );
+                    
                     System.out.println("Processo: " + contagemProcesso+"/"+nomeTabelaCloud.size());
                     contagemProcesso++;
-                   
-                   
+
                 }
                 
             }
@@ -75,17 +68,13 @@ public class SincronizacaoService
                     System.out.println("Tabelas criadas com sucesso.");
                 }
     
-                // if (queryChaveSecundaria.length() > 0)
-                // {
-                //     stmt.executeUpdate(queryChaveSecundaria.toString());
-                //     System.out.println("Chaves estrangeiras adicionadas com sucesso.");
-                // }
+                if (queryChaveSecundaria.length() > 0)
+                {
+                    stmt.executeUpdate(queryChaveSecundaria.toString());
+                    System.out.println("Chaves estrangeiras adicionadas com sucesso.");
+                }
     
-                // if (queryIndices.length() > 0)
-                // {
-                //     stmt.executeUpdate(queryIndices.toString());
-                //     System.out.println("Índices adicionados com sucesso.");
-                // }
+               
             }
 
         }
