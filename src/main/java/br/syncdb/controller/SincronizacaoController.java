@@ -52,18 +52,19 @@ public class SincronizacaoController
 
 	// }
 	
-    @GetMapping(value = "/base/{base}/{banco}", produces = "application/json")
-	public ResponseEntity<?> listarTabelas ( @PathVariable (value = "base") String base ,  @PathVariable (value = "banco") String banco) 
+    @GetMapping(value = "/base/{base}", produces = "application/json")
+	public ResponseEntity<?> listarTabelas ( @PathVariable (value = "base") String base ) 
 	{
-		
-		Map<String, String> lista = sincronizacaoService.executarCriacaoTabela(base, banco);
+		String banco = "";
+		 sincronizacaoService.executarCriacaoTabela(base, banco);
 
-		if(lista.isEmpty())
-		{
-	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
-		}
+		// if(lista.isEmpty())
+		// {
+	    //     return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
+		// }
 	
-		return new ResponseEntity<>(lista, HttpStatus.OK);
+		return ResponseEntity.status(HttpStatus.OK).body("{\"mensagem\": \"Retorno Base\"}");
+
 
 	}
    

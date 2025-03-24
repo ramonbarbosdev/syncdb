@@ -39,11 +39,21 @@ public class ConexaoBanco {
 
         String host = ConfiguracaoBanco.get(prefixo + ".host");
         String port = ConfiguracaoBanco.get(prefixo + ".port");
-        String user = ConfiguracaoBanco.get(prefixo + ".username");
+        String user = ConfiguracaoBanco.get(prefixo + ".user");
         String password = ConfiguracaoBanco.get(prefixo + ".password");
 
         String url = "jdbc:postgresql://" + host + ":" + port + "/" + database;
-        return DriverManager.getConnection(url, user, password);
+        Connection connection = null;
+        try
+        {
+            connection = DriverManager.getConnection(url, user, password);
+        }
+        catch (SQLException e)
+        {
+            System.err.println("Erro: " + e.getMessage() + " Base: " + database + ". Conexao: "+ tipo); 
+        }
+
+        return connection; 
 
     }
 

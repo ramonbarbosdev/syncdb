@@ -1,12 +1,16 @@
 package br.syncdb.service;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,47 +27,62 @@ public class SincronizacaoService
 
 
 
-    public   Map<String, String> executarCriacaoTabela(String base, String banco)
+    public   void executarCriacaoTabela(String base, String banco)
     {
         try
         {
-            Map<String, String> estruturaTabelas = obterEstruturaTabela(base, banco);
+            //cloud
+            Set<String> nomeTabelaCloud =  obterMetaData( base,  TipoConexao.CLOUD);
+            Set<String> nomeTabelaLocal =  obterMetaData( base,  TipoConexao.LOCAL);
+           
 
-            if(estruturaTabelas == null)
+            for (String nomeTabela : nomeTabelaCloud)
             {
-                return null;
-            }
-  
-            for(  Entry<String, String> entry : estruturaTabelas.entrySet())
-            {
-                String tabelaName = entry.getKey();
-                String scriptTabela = entry.getValue();
-    
-    
-                if (!databaseService.verificarTabelaExistente(base, TipoConexao.LOCAL, tabelaName))
+                if (!nomeTabelaLocal.contains(nomeTabela))
                 {
-                    Connection conexao = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-    
-                    conexao.createStatement().executeUpdate(scriptTabela);
-                    System.out.println("Tabela criada com sucesso: " + tabelaName);
+                    System.out.println("Tabela " + nomeTabela + " não existe no banco local.");
+                    // Aqui você pode criar a tabela no banco local se necessário
                 }
-    
             }
-
-            return estruturaTabelas;
 
         }
         catch (Exception e)
         {
             e.printStackTrace();
         }
+              
+    }
+
+    public  Set<String>  obterMetaData(String base, TipoConexao tipo)
+    {
+        try
+        {
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            if( conexao == null)
+            {
+                return null;
+            }
+
+            DatabaseMetaData conexaoMetaData = conexao.getMetaData();
+            ResultSet tabelas = conexaoMetaData.getTables(null, null, "%", new String[] {"TABLE"});
+            
+            Set<String> nomeTabelas = new HashSet<>();
+            while (tabelas.next())
+            {
+                nomeTabelas.add(tabelas.getString("TABLE_NAME"));
+            }
+
+            return nomeTabelas;
+        }
+        catch (SQLException e)
+        {
+            throw new RuntimeException(e);
+        }
         finally
         {
             ConexaoBanco.fecharConexao(base);
         }
-
-        return null;
-      
     }
 
     public Map<String, String> obterEstruturaTabela(String base, String banco)
