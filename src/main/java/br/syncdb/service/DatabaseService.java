@@ -179,9 +179,9 @@ public class DatabaseService
                     if (defaultColuna.toLowerCase().contains("uuid_generate_v4()")) {
                         needsUuidOssp = true;
                     }
-                    else if (!tipoColuna.equalsIgnoreCase("serial"))
-                    {
-                       
+                    else if (defaultColuna != null && !defaultColuna.isEmpty()) 
+                    {                    
+                        createTableScript.append(" DEFAULT ").append(defaultColuna);
                     }
                 }
             }

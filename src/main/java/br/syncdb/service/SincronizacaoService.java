@@ -56,26 +56,20 @@ public class SincronizacaoService
 
             Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);
 
+            CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync(() -> 
+            databaseService.obterTabelaMetaData(base, conexaoCloud));
+
+            Set<String> nomeTabelaCloud = futureCloud.get(5, TimeUnit.MINUTES);
+
             if(nomeTabela == null)
             {
-                CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync(() -> 
-                databaseService.obterTabelaMetaData(base, conexaoCloud));
-
-                Set<String> nomeTabelaCloud = futureCloud.get(5, TimeUnit.MINUTES);
-  
-                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response);
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response, null);
             }
             else
             {
-                Set<String> nomeTabelaSet = new HashSet<>();
-                nomeTabelaSet.add(nomeTabela);
-
-                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaSet, nomeTabelaLocal, response);
-
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response, nomeTabela);
             }
            
-            
-            
         }
         catch (SQLException e)
         {
@@ -114,7 +108,7 @@ public class SincronizacaoService
         return response;
     }
 
-    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal,  Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal, Map<String, Object> response) 
+    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal,  Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal, Map<String, Object> response,  String nomeTabelaUni) 
     throws SQLException
     {
        
@@ -136,13 +130,17 @@ public class SincronizacaoService
         try 
         {
             List<CompletableFuture<Void>> futures = nomeTabelaCloud.stream()
-                .map(nomeTabela -> CompletableFuture.runAsync(() -> 
+            .map(tabela -> CompletableFuture.runAsync(() ->
+            {
+                if (nomeTabelaUni != null && !tabela.equals( nomeTabelaUni))
+                {
+                    return; 
+                }
+        
+                processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes);
 
-                    processarTabelaIndividual( conexaoCloud, conexaoLocal, nomeTabela, nomeTabelaLocal,  criacoesTabela, chavesEstrangeiras, alteracoes),
-                     executor
-                     ))
-
-                .collect(Collectors.toList());
+            }, executor))
+            .collect(Collectors.toList());
 
   
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get();
@@ -182,6 +180,7 @@ public class SincronizacaoService
         {
             if (!nomeTabelaLocal.contains(nomeTabela))
             {
+                
                 String createTable = databaseService.criarEstuturaTabela(conexaoCloud, nomeTabela);
 
                 if (createTable != null)
