@@ -40,80 +40,106 @@ public class SincronizacaoService
 
     //todo: implementar a o insert no momento que criar os scripts
     
-    public void executarSincronizacaoTotal(String base, String banco)
+    public void executarSincronizacao(String base, String nomeTabela )
     {
-        try {
+        try
+        {
             Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-           
-            CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync(() -> 
+
+           if(nomeTabela == null)
+           {
+                CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync(() -> 
                 databaseService.obterTabelaMetaData(base, conexaoCloud));
 
-            CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync(() -> 
-                databaseService.obterTabelaMetaData(base, conexaoLocal));
-                
-                // Esperar com timeout de 5 minutos
-            Set<String> nomeTabelaCloud = futureCloud.get(5, TimeUnit.MINUTES);
+                CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync(() -> 
+                    databaseService.obterTabelaMetaData(base, conexaoLocal));
+                    
+                Set<String> nomeTabelaCloud = futureCloud.get(5, TimeUnit.MINUTES);
 
-            Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);
-                
-            processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal);
+                Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);
+                    
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal);
+            }
+            else
+            {
+                Set<String> nomeTabelaSet = new HashSet<>();
+                nomeTabelaSet.add(nomeTabela);
+
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaSet, nomeTabelaSet);
+
+            }
+           
             
-        } catch (SQLException e) {
+            
+        }
+        catch (SQLException e)
+        {
             logError("Erro de SQL durante sincronização", e);
-        } catch (InterruptedException e) {
+        }
+        catch (InterruptedException e)
+        {
             Thread.currentThread().interrupt();
             logError("Execução interrompida", e);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             logError("Erro inesperado durante sincronização", e);
         }
     }
 
-    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal, 
-        Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal) throws SQLException
+    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal,  Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal) throws SQLException
     {
-        // estruturas thread-safe
+       
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
         List<String> funcoes = Collections.synchronizedList(new ArrayList<>());
         List<String> criacoesTabela = Collections.synchronizedList(new ArrayList<>());
         List<String> chavesEstrangeiras = Collections.synchronizedList(new ArrayList<>());
         List<String> alteracoes = Collections.synchronizedList(new ArrayList<>());
 
-        // Processar sequências uma única vez
         String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal);
         if (sequenciaQuery != null)
         {
             sequencias.add(sequenciaQuery);
         }
 
-        // Thread Pool para processamento paralelo
         int threadCount = Math.min(Runtime.getRuntime().availableProcessors() * 2, 16);
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         
         try 
         {
-           
             List<CompletableFuture<Void>> futures = nomeTabelaCloud.stream()
                 .map(nomeTabela -> CompletableFuture.runAsync(() -> 
-                    processarTabelaIndividual(
-                        conexaoCloud, conexaoLocal, nomeTabela, nomeTabelaLocal,
-                        criacoesTabela, chavesEstrangeiras, alteracoes), executor))
+
+                    processarTabelaIndividual( conexaoCloud, conexaoLocal, nomeTabela, nomeTabelaLocal,  criacoesTabela, chavesEstrangeiras, alteracoes), executor))
+
                 .collect(Collectors.toList());
 
   
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get();
 
         }
-        catch (InterruptedException e) {
+        catch (InterruptedException e)
+        {
             Thread.currentThread().interrupt();
             throw new SQLException("Processamento interrompido", e);
-        } catch (ExecutionException e) {
+        }
+        catch (ExecutionException e)
+        {
             throw new SQLException("Erro durante processamento paralelo", e);
-        } finally {
+        } 
+        finally
+        {
             executor.shutdownNow();
         }
 
-        executarQueriesEmLotes(conexaoLocal, sequencias, funcoes, criacoesTabela, chavesEstrangeiras, alteracoes);
+        HashMap<String, List<String>> queries = new HashMap<String,List<String>>();
+        queries.put("Sequências", sequencias);
+        queries.put("Criação de Tabelas", criacoesTabela);
+        queries.put("Chaves Estrangeiras",chavesEstrangeiras);
+        queries.put("Alterações",alteracoes);
+        queries.put("Criação de Tabelas", funcoes);
+
+        executarQueriesEmLotes(conexaoLocal, queries);
     }
 
     private void processarTabelaIndividual(Connection conexaoCloud, Connection conexaoLocal,
@@ -126,7 +152,6 @@ public class SincronizacaoService
         {
             if (!nomeTabelaLocal.contains(nomeTabela))
             {
-                // Processar nova tabela
                 String createTable = databaseService.criarEstuturaTabela(conexaoCloud, nomeTabela);
 
                 if (createTable != null)
@@ -144,7 +169,6 @@ public class SincronizacaoService
             }
             else
             {
-                // Processar alterações
                 String alterQuery = databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela);
 
                 if (alterQuery != null)
@@ -160,22 +184,21 @@ public class SincronizacaoService
         }
     }
 
-    private void executarQueriesEmLotes(Connection conexaoLocal, 
-        List<String> sequencias, List<String> funcoes, 
-        List<String> criacoesTabela, List<String> chavesEstrangeiras,
-        List<String> alteracoes) throws SQLException
+
+
+
+    private void executarQueriesEmLotes(Connection conexaoLocal, HashMap<String, List<String>> queries) throws SQLException
     {
         
         conexaoLocal.setAutoCommit(false);
         
         try
         {
-            executarLoteComThreadPool(conexaoLocal, sequencias, "Sequências");
-            executarLoteComThreadPool(conexaoLocal, criacoesTabela, "Criação de Tabelas");
-            executarLoteComThreadPool(conexaoLocal, alteracoes, "Alterações");
-            executarLoteComThreadPool(conexaoLocal, chavesEstrangeiras, "Chaves Estrangeiras");
-            executarLoteComThreadPool(conexaoLocal, funcoes, "Funções");
-            
+            for (String i : queries.keySet())
+            {
+                executarLoteComThreadPool(conexaoLocal, queries.get(i), i);
+            }
+           
             conexaoLocal.commit();
         }
         catch (SQLException e)
@@ -198,7 +221,8 @@ public class SincronizacaoService
         ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(
             Math.min(queries.size(), Runtime.getRuntime().availableProcessors() * 2));
         
-        try {
+        try
+        {
             // Contador progresso
             AtomicInteger successCount = new AtomicInteger(0);
             AtomicInteger errorCount = new AtomicInteger(0);
