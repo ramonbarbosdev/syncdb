@@ -56,29 +56,35 @@ public class SincronizacaoController
 	public ResponseEntity<?> sincronizacaoTotal ( @PathVariable (value = "base") String base ) 
 	{
 	
-		sincronizacaoService.executarSincronizacao(base,  null);
+		Map<String, Object>  resultado = sincronizacaoService.executarSincronizacao(base,  null);
 
-		// if(lista.isEmpty())
-		// {
-	    //     return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
-		// }
-	
-		return ResponseEntity.status(HttpStatus.OK).body("{\"mensagem\": \"Sincronizacao total concluido.\"}");
+		if ((Boolean) resultado.get("success"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
 
 
 	}
     @GetMapping(value = "/estrutura/{base}/{tabela}", produces = "application/json")
-	public ResponseEntity<?> sincronizacaoTotal ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
+	public ResponseEntity<?> sincronizacaoIndividual ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
 	{
 	
-		sincronizacaoService.executarSincronizacao(base, tabela);
+		Map<String, Object> resultado = sincronizacaoService.executarSincronizacao(base,  tabela);
 
-		// if(lista.isEmpty())
-		// {
-	    //     return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"Base não encontrada\"}");
-		// }
-	
-		return ResponseEntity.status(HttpStatus.OK).body("{\"mensagem\": \"Sinconizacao individual concluido.\"}");
+		if ((Boolean) resultado.get("success"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
 
 
 	}

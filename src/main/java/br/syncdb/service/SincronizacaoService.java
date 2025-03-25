@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -21,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.Map.Entry;
@@ -38,35 +40,37 @@ public class SincronizacaoService
     @Autowired
     private DatabaseService databaseService;
 
-    //todo: implementar a o insert no momento que criar os scripts
-    
-    public void executarSincronizacao(String base, String nomeTabela )
+     
+    public Map<String, Object> executarSincronizacao(String base, String nomeTabela )
     {
+        Map<String, Object> response = new HashMap<>();
         try
         {
+
             Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
 
-           if(nomeTabela == null)
-           {
+            CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync(() -> 
+                    databaseService.obterTabelaMetaData(base, conexaoLocal)
+                );
+
+            Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);
+
+            if(nomeTabela == null)
+            {
                 CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync(() -> 
                 databaseService.obterTabelaMetaData(base, conexaoCloud));
 
-                CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync(() -> 
-                    databaseService.obterTabelaMetaData(base, conexaoLocal));
-                    
                 Set<String> nomeTabelaCloud = futureCloud.get(5, TimeUnit.MINUTES);
-
-                Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);
-                    
-                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal);
+  
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response);
             }
             else
             {
                 Set<String> nomeTabelaSet = new HashSet<>();
                 nomeTabelaSet.add(nomeTabela);
 
-                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaSet, nomeTabelaSet);
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaSet, nomeTabelaLocal, response);
 
             }
            
@@ -75,19 +79,43 @@ public class SincronizacaoService
         }
         catch (SQLException e)
         {
-            logError("Erro de SQL durante sincronização", e);
+            response.put("success", false);
+            response.put("errorType", "DATABASE_ERROR");
+            response.put("message", "Erro de SQL durante sincronização: " + e.getMessage());
+        
         }
         catch (InterruptedException e)
         {
             Thread.currentThread().interrupt();
-            logError("Execução interrompida", e);
+            response.put("success", false);
+            response.put("errorType", "INTERRUPTED");
+            response.put("message", "Execução interrompida");
+            
         }
-        catch (Exception e) {
-            logError("Erro inesperado durante sincronização", e);
+        catch (TimeoutException e)
+        {
+            response.put("success", false);
+            response.put("errorType", "TIMEOUT");
+            response.put("message", "Tempo limite excedido na operação");
+            
         }
+        catch (Exception e)
+        {
+            response.put("success", false);
+            response.put("errorType", "UNEXPECTED_ERROR");
+            response.put("message", "Erro inesperado durante sincronização");
+            response.put("details", e.getClass().getSimpleName() + ": " + e.getMessage());
+            
+        } finally
+        {
+            ConexaoBanco.fecharTodos();
+        }
+
+        return response;
     }
 
-    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal,  Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal) throws SQLException
+    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal,  Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal, Map<String, Object> response) 
+    throws SQLException
     {
        
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
@@ -110,7 +138,9 @@ public class SincronizacaoService
             List<CompletableFuture<Void>> futures = nomeTabelaCloud.stream()
                 .map(nomeTabela -> CompletableFuture.runAsync(() -> 
 
-                    processarTabelaIndividual( conexaoCloud, conexaoLocal, nomeTabela, nomeTabelaLocal,  criacoesTabela, chavesEstrangeiras, alteracoes), executor))
+                    processarTabelaIndividual( conexaoCloud, conexaoLocal, nomeTabela, nomeTabelaLocal,  criacoesTabela, chavesEstrangeiras, alteracoes),
+                     executor
+                     ))
 
                 .collect(Collectors.toList());
 
@@ -132,14 +162,14 @@ public class SincronizacaoService
             executor.shutdownNow();
         }
 
-        HashMap<String, List<String>> queries = new HashMap<String,List<String>>();
+        HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Sequências", sequencias);
         queries.put("Criação de Tabelas", criacoesTabela);
         queries.put("Chaves Estrangeiras",chavesEstrangeiras);
         queries.put("Alterações",alteracoes);
-        queries.put("Criação de Tabelas", funcoes);
+        // queries.put("Criação de Tabelas", funcoes);
 
-        executarQueriesEmLotes(conexaoLocal, queries);
+        executarQueriesEmLotes(conexaoLocal, queries, response);
     }
 
     private void processarTabelaIndividual(Connection conexaoCloud, Connection conexaoLocal,
@@ -180,14 +210,14 @@ public class SincronizacaoService
         }
         catch (SQLException e)
         {
-            logError("Erro ao processar tabela " + nomeTabela, e);
+            logRetorno("Erro ao processar tabela " + nomeTabela, e);
         }
     }
 
 
 
 
-    private void executarQueriesEmLotes(Connection conexaoLocal, HashMap<String, List<String>> queries) throws SQLException
+    private void executarQueriesEmLotes(Connection conexaoLocal, HashMap<String, List<String>> queries, Map<String, Object> response) throws SQLException
     {
         
         conexaoLocal.setAutoCommit(false);
@@ -196,7 +226,7 @@ public class SincronizacaoService
         {
             for (String i : queries.keySet())
             {
-                executarLoteComThreadPool(conexaoLocal, queries.get(i), i);
+                executarLoteComThreadPool(conexaoLocal, queries.get(i), i, response);
             }
            
             conexaoLocal.commit();
@@ -208,10 +238,12 @@ public class SincronizacaoService
         }
     }
 
-    private void executarLoteComThreadPool(Connection conexao, List<String> queries, String tipo) 
+    private void executarLoteComThreadPool(Connection conexao, List<String> queries, String tipo, Map<String, Object> response) 
         throws SQLException
     {
         
+        response.put("success", true);
+
         if (queries.isEmpty())
         {
             System.out.printf("[%s] Nenhuma query para executar.%n", tipo);
@@ -240,7 +272,6 @@ public class SincronizacaoService
                         stmt.execute(query);
                         successCount.incrementAndGet();
                         
-                        // Log de progresso a cada 100 queries
                         if (successCount.get() % 100 == 0)
                         {
                             System.out.printf("[%s] Progresso: %d/%d%n", 
@@ -250,8 +281,14 @@ public class SincronizacaoService
                     }
                     catch (SQLException e)
                     {
+                        
                         errorCount.incrementAndGet();
-                        logError(String.format("[%s] Erro na query", tipo), e);
+                        logRetorno(String.format("[%s] Erro na query", tipo), e);
+
+                        response.put("success", false);
+                        response.put("message", "Erro na query");
+                        response.put("details", e.getMessage());
+
                     }
                     finally
                     {
@@ -267,13 +304,12 @@ public class SincronizacaoService
             // Log final
             long duration = System.currentTimeMillis() - startTime;
 
-            System.out.printf("[%s] Concluído em %d ms. Sucessos: %d, Erros: %d%n",
-                            tipo, duration, successCount.get(), errorCount.get());
+            // response.put("message", "Concluído em "+duration+" ms. Sucessos: "+successCount.get()+", Erros: "+errorCount.get()+"");
+            response.put("message", "Concluído");
 
             if (errorCount.get() > 0)
             {
-                throw new SQLException(String.format("%d erros durante execução de %s", 
-                                                errorCount.get(), tipo));
+                throw new SQLException(String.format("%d erros durante execução de %s", errorCount.get(), tipo));
             }
             
         }
@@ -281,6 +317,7 @@ public class SincronizacaoService
         {
             Thread.currentThread().interrupt();
             throw new SQLException("Execução interrompida", e);
+
         }
         finally
         {
@@ -288,10 +325,20 @@ public class SincronizacaoService
         }
     }
 
-    private void logError(String message, Exception e)
+    private String logRetorno(String message, Exception e)
     {
-        System.err.println(message + ": " + e.getMessage());
-        e.printStackTrace(System.err);
+        String msgRetorno = message;
+
+        if(e != null)
+        {
+            System.err.println(message + ": " + e.getMessage());
+            // e.printStackTrace(System.err);
+
+            msgRetorno = message + ": " + e.getMessage();
+        }
+
+        return msgRetorno;
+       
     }
 
     // private void executarLotes(Statement stmt, List<String> queries, String tipo) throws SQLException {
