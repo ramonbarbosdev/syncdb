@@ -150,26 +150,29 @@ public class DatabaseService
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
         
-        // 1. Identificar colunas serial primeiro
+        // identificar colunas serial primeiro
         Map<String, String> serialColumns = new HashMap<>();
         try (PreparedStatement stmt = conexao.prepareStatement(
                 "SELECT column_name, column_default FROM information_schema.columns " +
                 "WHERE table_name = ? AND column_default LIKE 'nextval%'")) {
             stmt.setString(1, nomeTabela);
             ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
+            while (rs.next())
+            {
                 String colName = rs.getString(1);
                 String seqDef = rs.getString(2).replace("::regclass", "").trim();
                 serialColumns.put(colName, seqDef);
             }
         }
     
-        // 2. Construir o script
+        // construir o script
         createTableScript.append("CREATE TABLE ").append(nomeTabela).append(" (\n");
         
         DatabaseMetaData metaData = conexao.getMetaData();
-        try (ResultSet columns = metaData.getColumns(null, "public", nomeTabela, null)) {
-            while (columns.next()) {
+        try (ResultSet columns = metaData.getColumns(null, "public", nomeTabela, null))
+        {
+            while (columns.next())
+            {
                 String colName = columns.getString("COLUMN_NAME").trim();
                 String typeName = columns.getString("TYPE_NAME").trim();
                 boolean isNullable = "1".equals(columns.getString("NULLABLE"));
@@ -177,26 +180,35 @@ public class DatabaseService
                 
                 createTableScript.append("    ").append(colName).append(" ");
                 
-                // Tratamento para colunas serial
-                if (serialColumns.containsKey(colName)) {
-                    createTableScript.append("integer"); // Ou bigint para serial8
-                } else {
+                //tratamento para colunas serial
+                if (serialColumns.containsKey(colName))
+                {
+                    createTableScript.append("integer"); 
+                }
+                else
+                {
                     createTableScript.append(typeName);
                 }
                 
-                if (!isNullable) {
+                if (!isNullable)
+                {
                     createTableScript.append(" NOT NULL");
                 }
                 
                 // Default values
-                if (serialColumns.containsKey(colName)) {
+                if (serialColumns.containsKey(colName))
+                {
                     createTableScript.append(" DEFAULT ").append(serialColumns.get(colName));
-                } else if (defaultValue != null && !defaultValue.isEmpty()) {
-                    if (defaultValue.toLowerCase().contains("uuid_generate_v4()")) {
+                }
+                else if (defaultValue != null && !defaultValue.isEmpty())
+                {
+                    if (defaultValue.toLowerCase().contains("uuid_generate_v4()"))
+                    {
                         needsUuidOssp = true;
                         createTableScript.append(" DEFAULT uuid_generate_v4()");
-                    } else {
-                        // Limpa castings desnecessários
+                    }
+                    else
+                    {
                         String cleanDefault = defaultValue.split("::")[0].trim();
                         createTableScript.append(" DEFAULT ").append(cleanDefault);
                     }
@@ -206,18 +218,23 @@ public class DatabaseService
             }
         }
         
-        // 3. Adicionar primary keys
-        try (ResultSet pkRs = metaData.getPrimaryKeys(null, "public", nomeTabela)) {
+        // adicionar primary keys
+        try (ResultSet pkRs = metaData.getPrimaryKeys(null, "public", nomeTabela))
+        {
             List<String> pkColumns = new ArrayList<>();
-            while (pkRs.next()) {
+            while (pkRs.next())
+            {
                 pkColumns.add(pkRs.getString("COLUMN_NAME"));
             }
-            if (!pkColumns.isEmpty()) {
+
+            if (!pkColumns.isEmpty())
+            {
                 createTableScript.append("    PRIMARY KEY (")
                                .append(String.join(", ", pkColumns))
                                .append(")\n");
-            } else {
-                // Remove última vírgula
+            }
+            else
+            {
                 createTableScript.setLength(createTableScript.length() - 2);
                 createTableScript.append("\n");
             }
@@ -225,7 +242,8 @@ public class DatabaseService
         
         createTableScript.append(");");
         
-        if (needsUuidOssp) {
+        if (needsUuidOssp)
+        {
             createTableScript.insert(0, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n");
         }
         
@@ -237,7 +255,7 @@ public class DatabaseService
     {
         StringBuilder createTableScript = new StringBuilder();
 
-        String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public';";  // Ajuste o esquema, se necessário
+        String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public';"; 
         try (Statement stmtCloud = conexaoCloud.createStatement();
              ResultSet rsCloud = stmtCloud.executeQuery(querySequencias)) {
     
