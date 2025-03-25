@@ -144,87 +144,92 @@ public class DatabaseService
     }
     public String criarEstuturaTabela(Connection conexao, String nomeTabela) throws SQLException
     {
+
+        System.out.println("Criando estrutura da tabela: " + nomeTabela);
+
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
         
-        System.out.println("Criando a tabela: " + nomeTabela);
-
-        createTableScript.append("CREATE TABLE ").append(nomeTabela).append(" (\n");
-    
-        DatabaseMetaData metaData = conexao.getMetaData();
-        ResultSet resultadoQuery = metaData.getColumns(null, "public", nomeTabela, null);
-    
-        Set<String> primaryKeyColumns = new HashSet<>();
-    
-        while (resultadoQuery.next())
-        {
-            String nomeColuna = resultadoQuery.getString("COLUMN_NAME").trim();
-            String tipoColuna = resultadoQuery.getString("TYPE_NAME").trim();
-            String nullable = resultadoQuery.getString("NULLABLE");
-            String defaultColuna = resultadoQuery.getString("COLUMN_DEF");
-    
-            createTableScript.append("    ")
-                             .append(nomeColuna).append(" ")
-                             .append(tipoColuna);
-    
-            if ("0".equals(nullable))
-            {
-                createTableScript.append(" NOT NULL");
+        // 1. Identificar colunas serial primeiro
+        Map<String, String> serialColumns = new HashMap<>();
+        try (PreparedStatement stmt = conexao.prepareStatement(
+                "SELECT column_name, column_default FROM information_schema.columns " +
+                "WHERE table_name = ? AND column_default LIKE 'nextval%'")) {
+            stmt.setString(1, nomeTabela);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                String colName = rs.getString(1);
+                String seqDef = rs.getString(2).replace("::regclass", "").trim();
+                serialColumns.put(colName, seqDef);
             }
+        }
     
-            if (defaultColuna != null && !defaultColuna.isEmpty())
-            {
-                if (!defaultColuna.toLowerCase().contains("uuid_generate_v4()") || !needsUuidOssp)
-                {
-                    if (defaultColuna.toLowerCase().contains("uuid_generate_v4()")) {
+        // 2. Construir o script
+        createTableScript.append("CREATE TABLE ").append(nomeTabela).append(" (\n");
+        
+        DatabaseMetaData metaData = conexao.getMetaData();
+        try (ResultSet columns = metaData.getColumns(null, "public", nomeTabela, null)) {
+            while (columns.next()) {
+                String colName = columns.getString("COLUMN_NAME").trim();
+                String typeName = columns.getString("TYPE_NAME").trim();
+                boolean isNullable = "1".equals(columns.getString("NULLABLE"));
+                String defaultValue = columns.getString("COLUMN_DEF");
+                
+                createTableScript.append("    ").append(colName).append(" ");
+                
+                // Tratamento para colunas serial
+                if (serialColumns.containsKey(colName)) {
+                    createTableScript.append("integer"); // Ou bigint para serial8
+                } else {
+                    createTableScript.append(typeName);
+                }
+                
+                if (!isNullable) {
+                    createTableScript.append(" NOT NULL");
+                }
+                
+                // Default values
+                if (serialColumns.containsKey(colName)) {
+                    createTableScript.append(" DEFAULT ").append(serialColumns.get(colName));
+                } else if (defaultValue != null && !defaultValue.isEmpty()) {
+                    if (defaultValue.toLowerCase().contains("uuid_generate_v4()")) {
                         needsUuidOssp = true;
-                    }
-                    else if (defaultColuna != null && !defaultColuna.isEmpty()) 
-                    {                    
-                        createTableScript.append(" DEFAULT ").append(defaultColuna);
+                        createTableScript.append(" DEFAULT uuid_generate_v4()");
+                    } else {
+                        // Limpa castings desnecessários
+                        String cleanDefault = defaultValue.split("::")[0].trim();
+                        createTableScript.append(" DEFAULT ").append(cleanDefault);
                     }
                 }
-            }
-    
-    
-            createTableScript.append(",\n");
-        }
-    
-        resultadoQuery.close();
-    
-        try (ResultSet pkResultSet = metaData.getPrimaryKeys(null, "public", nomeTabela))
-        {
-            while (pkResultSet.next())
-            {
-                String pkColumnName = pkResultSet.getString("COLUMN_NAME");
-                primaryKeyColumns.add(pkColumnName);
+                
+                createTableScript.append(",\n");
             }
         }
-    
-        if (!primaryKeyColumns.isEmpty())
-        {
-            createTableScript.append("    PRIMARY KEY (")
-                             .append(String.join(", ", primaryKeyColumns))
-                             .append(")\n");
-        }
-        else
-        {
-            int lastCommaIndex = createTableScript.lastIndexOf(",");
-            if (lastCommaIndex != -1)
-            {
-                createTableScript.deleteCharAt(lastCommaIndex);
+        
+        // 3. Adicionar primary keys
+        try (ResultSet pkRs = metaData.getPrimaryKeys(null, "public", nomeTabela)) {
+            List<String> pkColumns = new ArrayList<>();
+            while (pkRs.next()) {
+                pkColumns.add(pkRs.getString("COLUMN_NAME"));
+            }
+            if (!pkColumns.isEmpty()) {
+                createTableScript.append("    PRIMARY KEY (")
+                               .append(String.join(", ", pkColumns))
+                               .append(")\n");
+            } else {
+                // Remove última vírgula
+                createTableScript.setLength(createTableScript.length() - 2);
+                createTableScript.append("\n");
             }
         }
-    
-        createTableScript.append(");\n");
-    
-        if (needsUuidOssp)
-        {
-            createTableScript.insert(0, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n");
+        
+        createTableScript.append(");");
+        
+        if (needsUuidOssp) {
+            createTableScript.insert(0, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n");
         }
-    
-        return createTableScript.length() > 0 ?  createTableScript.toString() : null;
-    
+        
+        return createTableScript.toString();
     }
 
 

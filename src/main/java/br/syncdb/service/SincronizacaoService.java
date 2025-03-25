@@ -1,5 +1,6 @@
 package br.syncdb.service;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -40,6 +41,8 @@ public class SincronizacaoService
     @Autowired
     private DatabaseService databaseService;
 
+    @Autowired
+    private QueryArquivoService queryArquivoService;
      
     public Map<String, Object> executarSincronizacao(String base, String nomeTabela )
     {
@@ -63,11 +66,11 @@ public class SincronizacaoService
 
             if(nomeTabela == null)
             {
-                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response, null);
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response,base, null);
             }
             else
             {
-                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response, nomeTabela);
+                processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response,base, nomeTabela);
             }
            
         }
@@ -108,10 +111,25 @@ public class SincronizacaoService
         return response;
     }
 
-    private void processarTabelas(Connection conexaoCloud, Connection conexaoLocal,  Set<String> nomeTabelaCloud, Set<String> nomeTabelaLocal, Map<String, Object> response,  String nomeTabelaUni) 
+    private void processarTabelas(Connection conexaoCloud,
+    Connection conexaoLocal,
+    Set<String> nomeTabelaCloud,
+    Set<String> nomeTabelaLocal,
+    Map<String, Object> response,
+    String base,
+    String nomeTabelaUni
+    ) 
     throws SQLException
     {
-       
+        
+        String pastaQueries = "src\\main\\java\\br\\syncdb\\query\\queries_"+base;
+        File diretorio = new File(pastaQueries);
+        
+        if (!diretorio.exists())
+        {
+            diretorio.mkdir();
+        }
+
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
         List<String> funcoes = Collections.synchronizedList(new ArrayList<>());
         List<String> criacoesTabela = Collections.synchronizedList(new ArrayList<>());
@@ -119,6 +137,7 @@ public class SincronizacaoService
         List<String> alteracoes = Collections.synchronizedList(new ArrayList<>());
 
         String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal);
+        
         if (sequenciaQuery != null)
         {
             sequencias.add(sequenciaQuery);
@@ -129,6 +148,7 @@ public class SincronizacaoService
         
         try 
         {
+            
             List<CompletableFuture<Void>> futures = nomeTabelaCloud.stream()
             .map(tabela -> CompletableFuture.runAsync(() ->
             {
@@ -137,11 +157,11 @@ public class SincronizacaoService
                     return; 
                 }
         
-                processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes);
+                 processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes);
+              
 
             }, executor))
             .collect(Collectors.toList());
-
   
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get();
 
@@ -167,14 +187,22 @@ public class SincronizacaoService
         queries.put("Alterações",alteracoes);
         // queries.put("Criação de Tabelas", funcoes);
 
+        
         executarQueriesEmLotes(conexaoLocal, queries, response);
+        
+        queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
+
+        response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
     private void processarTabelaIndividual(Connection conexaoCloud, Connection conexaoLocal,
-        String nomeTabela, Set<String> nomeTabelaLocal,
-        List<String> criacoesTabela, List<String> chavesEstrangeiras,
+        String nomeTabela,
+        Set<String> nomeTabelaLocal,
+        List<String> criacoesTabela,
+        List<String> chavesEstrangeiras,
         List<String> alteracoes)
     {
+
         
         try
         {
@@ -185,6 +213,7 @@ public class SincronizacaoService
 
                 if (createTable != null)
                 {
+                    
                     criacoesTabela.add(createTable);
                 }
                 
@@ -192,6 +221,7 @@ public class SincronizacaoService
 
                 if (fkQuery != null)
                 {
+                    
                     chavesEstrangeiras.add(fkQuery);
                 }
 
@@ -202,6 +232,7 @@ public class SincronizacaoService
 
                 if (alterQuery != null)
                 {
+                   
                     alteracoes.add(alterQuery);
                 }
             }
@@ -211,6 +242,8 @@ public class SincronizacaoService
         {
             logRetorno("Erro ao processar tabela " + nomeTabela, e);
         }
+
+  
     }
 
 
