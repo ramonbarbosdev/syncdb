@@ -53,10 +53,10 @@ public class SincronizacaoController
 	// }
 	
     @GetMapping(value = "/estrutura/{base}", produces = "application/json")
-	public ResponseEntity<?> sincronizacaoTotal ( @PathVariable (value = "base") String base ) 
+	public ResponseEntity<?> sincronizacaoEstruturaTotal ( @PathVariable (value = "base") String base ) 
 	{
 	
-		Map<String, Object>  resultado = sincronizacaoService.executarSincronizacao(base,  null);
+		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null);
 
 		if ((Boolean) resultado.get("success"))
 		{
@@ -71,10 +71,29 @@ public class SincronizacaoController
 
 	}
     @GetMapping(value = "/estrutura/{base}/{tabela}", produces = "application/json")
-	public ResponseEntity<?> sincronizacaoIndividual ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
+	public ResponseEntity<?> sincronizacaoEstruturaIndividual ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
 	{
 	
-		Map<String, Object> resultado = sincronizacaoService.executarSincronizacao(base,  tabela);
+		Map<String, Object> resultado = sincronizacaoService.sincronizarEstrutura(base,  tabela);
+
+		if ((Boolean) resultado.get("success"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
+
+
+	}
+   
+    @GetMapping(value = "/dados/{base}/{tabela}", produces = "application/json")
+	public ResponseEntity<?> sincronizacaoDadosIndividual ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
+	{
+	
+		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  tabela);
 
 		if ((Boolean) resultado.get("success"))
 		{

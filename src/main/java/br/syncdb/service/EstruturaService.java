@@ -295,4 +295,11 @@ public class EstruturaService {
        
     }
 
+    public boolean compararEstruturaTabelas(Connection cloudConn, Connection localConn, String tabela) {
+        // Implementar comparação de estrutura das tabelas
+        // Retornar true se estruturas forem compatíveis
+
+        return true;
+    }
+
 }

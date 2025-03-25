@@ -43,8 +43,60 @@ public class SincronizacaoService
 
     @Autowired
     private EstruturaService estruturaService;
+
+    @Autowired
+    private DadosService dadosService;
+
+
+    public Map<String, Object> sincronizarDados(String base, String tabela)
+    {
+        Map<String, Object> response = new HashMap<>();
+
+        try
+        {
+            Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+
+            if(databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, tabela) != null)
+            {
+                throw new SQLException("Estrutura das tabelas divergente");
+            }
+
+            response.put("success", true);
+
+            String pkColumn = dadosService.obterColunaPK(conexaoCloud, tabela);
+            long maxCloudId = dadosService.obterMaxId(conexaoCloud, tabela, pkColumn);
+            long maxLocalId = dadosService.obterMaxId(conexaoLocal, tabela, pkColumn);
+
+            if (maxLocalId == 0)
+            {
+                dadosService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela);
+            }
+            else if (maxCloudId > maxLocalId)
+            {
+                dadosService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId);
+            }
+            else
+            {
+                System.out.println("Tabela " + tabela + " já está sincronizada");
+            }
+
+        }
+        catch (Exception e)
+        {
+            response.put("success", false);
+            response.put("errorType", "UNEXPECTED_ERROR");
+            response.put("message", "Erro inesperado durante sincronização");
+            response.put("details", e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+        finally
+        {
+            ConexaoBanco.fecharTodos();
+        }
+        return response;
+    }
      
-    public Map<String, Object> executarSincronizacao(String base, String nomeTabela )
+    public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela )
     {
         Map<String, Object> response = new HashMap<>();
         try
@@ -53,15 +105,17 @@ public class SincronizacaoService
             Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
 
-            CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync(() -> 
-                    databaseService.obterTabelaMetaData(base, conexaoLocal)
-                );
+            CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync
+            (() -> 
+                databaseService.obterTabelaMetaData(base, conexaoLocal)
+            );
 
+            CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync
+            (() -> 
+            databaseService.obterTabelaMetaData(base, conexaoCloud)
+            );
+            
             Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);
-
-            CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync(() -> 
-            databaseService.obterTabelaMetaData(base, conexaoCloud));
-
             Set<String> nomeTabelaCloud = futureCloud.get(5, TimeUnit.MINUTES);
 
             if(nomeTabela == null)
