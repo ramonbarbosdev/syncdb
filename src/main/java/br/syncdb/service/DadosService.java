@@ -2,11 +2,18 @@ package br.syncdb.service;
 
 import java.beans.Statement;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -107,7 +114,8 @@ public class DadosService {
                 }
             }
 
-            response.put("message", "Sincronização concluida.");
+            // response.put("message", "Sincronização da tabela "+tabela+" concluida.");
+           System.out.println("Sincronização da tabela "+tabela+" concluida.");
 
         }
         catch (SQLException e)
@@ -154,7 +162,8 @@ public class DadosService {
                 
                 localInsert.executeBatch();
                 conexaoLocal.commit();
-                response.put("message", "Sincronização incremental concluida.");
+                // response.put("message", "Sincronização incremental concluida.");
+                System.out.println("Sincronização da tabela "+tabela+" concluida.");
 
             }
         }
@@ -188,6 +197,53 @@ public class DadosService {
         {
             stmt.setObject(i, rs.getObject(i));
         }
+    }
+
+    public Map<String, Set<String>> obterDependenciasTabelas(Connection conexao) throws SQLException
+    {
+        Map<String, Set<String>> dependencias = new HashMap<>();
+
+        DatabaseMetaData metaData = conexao.getMetaData();
+        
+        try (ResultSet rs = metaData.getImportedKeys(conexao.getCatalog(), null, null))
+        {
+            while (rs.next())
+            {
+                String tabelaFilha = rs.getString("FKTABLE_NAME");
+                String tabelaPai = rs.getString("PKTABLE_NAME");
+                
+                dependencias.computeIfAbsent(tabelaFilha, k -> new HashSet<>()).add(tabelaPai);
+            }
+        }
+        
+        return dependencias;
+    }
+
+    public List<String> ordenarTabelasPorDependencia(Map<String, Set<String>> grafo)
+    {
+        List<String> ordenadas = new ArrayList<>();
+        Set<String> visitadas = new HashSet<>();
+        
+        for (String tabela : grafo.keySet()) {
+            if (!visitadas.contains(tabela)) {
+                ordenacaoTopologica(tabela, grafo, visitadas, ordenadas);
+            }
+        }
+        return ordenadas;
+    }
+
+    private void ordenacaoTopologica(String tabela, Map<String, Set<String>> grafo, 
+                                Set<String> visitadas, List<String> resultado)
+                                {
+        visitadas.add(tabela);
+
+        for (String dependente : grafo.getOrDefault(tabela, Collections.emptySet()))
+        {
+            if (!visitadas.contains(dependente)) {
+                ordenacaoTopologica(dependente, grafo, visitadas, resultado);
+            }
+        }
+        resultado.add(tabela);
     }
 
 }

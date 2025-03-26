@@ -57,33 +57,41 @@ public class SincronizacaoService
             Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
 
-            
-            Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
-            
-           
+
             if(databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, tabela) != null)
             {
                 throw new SQLException("Estrutura das tabelas divergente");
             }
 
+            
+            
+            Map<String, Set<String>> dependencias = dadosService.obterDependenciasTabelas(conexaoCloud);
+            
+            List<String> ordemCarga = dadosService.ordenarTabelasPorDependencia(dependencias);
+
+           for (String tabelaOrdenada : ordemCarga)
+           {
+              
+                // String pkColumn = dadosService.obterNomeColunaPK(conexaoCloud, tabelaOrdenada);
+                // long maxCloudId = dadosService.obterMaxId(conexaoCloud, tabelaOrdenada, pkColumn);
+                // long maxLocalId = dadosService.obterMaxId(conexaoLocal, tabelaOrdenada, pkColumn);
+
+                // if (maxLocalId == 0)
+                // {
+                //     dadosService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabelaOrdenada, response);
+                // }
+                // else if (maxCloudId > maxLocalId)
+                // {
+                //     dadosService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabelaOrdenada, pkColumn, maxLocalId,response);
+                // }
+                // else
+                // {
+                //     // response.put("message", "Dados da tabela " + tabela + " já está sincronizada");
+                //     System.out.println( "Dados da tabela " + tabelaOrdenada + " já está sincronizada");
+                // }
+           }
+
             response.put("success", true);
-
-            String pkColumn = dadosService.obterNomeColunaPK(conexaoCloud, tabela);
-            long maxCloudId = dadosService.obterMaxId(conexaoCloud, tabela, pkColumn);
-            long maxLocalId = dadosService.obterMaxId(conexaoLocal, tabela, pkColumn);
-
-            if (maxLocalId == 0)
-            {
-                dadosService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
-            }
-            else if (maxCloudId > maxLocalId)
-            {
-                dadosService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId,response);
-            }
-            else
-            {
-                response.put("message", "Dados da tabela " + tabela + " já está sincronizada");
-            }
 
         }
         catch (Exception e)
