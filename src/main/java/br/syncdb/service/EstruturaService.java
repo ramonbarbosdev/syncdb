@@ -65,6 +65,7 @@ public class EstruturaService {
         if (sequenciaQuery != null)
         {
             sequencias.add(sequenciaQuery);
+            response.put("sequencia", "SEQUENCIA_CRIADA");
         }
 
         int threadCount = Math.min(Runtime.getRuntime().availableProcessors() * 2, 16);
@@ -81,7 +82,7 @@ public class EstruturaService {
                     return; 
                 }
         
-                 processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes);
+                 processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes ,   response);
               
 
             }, executor))
@@ -114,7 +115,6 @@ public class EstruturaService {
         executarQueriesEmLotes(conexaoLocal, queries, response);
         
         // queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
-
         // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
@@ -123,7 +123,8 @@ public class EstruturaService {
         Set<String> nomeTabelaLocal,
         List<String> criacoesTabela,
         List<String> chavesEstrangeiras,
-        List<String> alteracoes)
+        List<String> alteracoes,
+        Map<String, Object> response)
     {
         try
         {
@@ -133,8 +134,7 @@ public class EstruturaService {
                 String createTable = databaseService.criarEstuturaTabela(conexaoCloud, nomeTabela);
 
                 if (createTable != null)
-                {
-                    
+                {       
                     criacoesTabela.add(createTable);
                 }
                 
@@ -142,9 +142,9 @@ public class EstruturaService {
 
                 if (fkQuery != null)
                 {
-                    
                     chavesEstrangeiras.add(fkQuery);
                 }
+                response.put(nomeTabela + "_status", "CRIACAO_CONCLUIDA");
 
             }
             else
@@ -152,9 +152,9 @@ public class EstruturaService {
                 String alterQuery = databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela);
 
                 if (alterQuery != null)
-                {
-                   
+                {                  
                     alteracoes.add(alterQuery);
+                    response.put(nomeTabela + "_status", "ALTERACAO_CONCLUIDA");
                 }
             }
 
@@ -196,10 +196,11 @@ public class EstruturaService {
     {
         
         response.put("success", true);
-
+        
         if (queries.isEmpty())
         {
             System.out.printf("[%s] Nenhuma query para executar.%n", tipo);
+            response.put("["+tipo+"]", "Nenhuma query para executar.");
             return;
         }
 
@@ -258,12 +259,13 @@ public class EstruturaService {
             long duration = System.currentTimeMillis() - startTime;
 
             // response.put("message", "Concluído em "+duration+" ms. Sucessos: "+successCount.get()+", Erros: "+errorCount.get()+"");
-            response.put("message", "Concluído");
 
             if (errorCount.get() > 0)
             {
                 throw new SQLException(String.format("%d erros durante execução de %s", errorCount.get(), tipo));
             }
+            
+            response.put("message", "Tabelas Sincronizadas.");
             
         }
         catch (InterruptedException e)

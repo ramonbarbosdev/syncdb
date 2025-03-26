@@ -104,25 +104,24 @@ public class SincronizacaoService
 
     public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela )
     {
-        Map<String, Object> response = new HashMap<>();
+        Map<String, Object> response = new LinkedHashMap<>(); 
+
+        Connection conexaoCloud = null;
+        Connection conexaoLocal = null;
         try
         {
-
-            Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
 
             Set<String> tabelasLocal = estruturaService.obterTabelas(conexaoLocal, base);
             Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
 
             estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, response,base, nomeTabela);
-
            
         }
         catch (SQLException e)
         {
-            response.put("success", false);
-            response.put("errorType", "DATABASE_ERROR");
-            response.put("message", "Erro de SQL durante sincronização: " + e.getMessage());
+            tratarErroSincronizacao(response, conexaoLocal, e);
         
         }
         catch (InterruptedException e)
@@ -149,7 +148,7 @@ public class SincronizacaoService
             
         } finally
         {
-            ConexaoBanco.fecharTodos();
+            finalizarConexoes(conexaoCloud, conexaoLocal);
         }
 
         return response;
@@ -194,7 +193,7 @@ public class SincronizacaoService
             System.out.println("Erro ao restaurar auto-commit "+e );
         }
         // System.out.println("fechar");
-        ConexaoBanco.fecharTodos();
+        ConexaoBanco.fecharConexao(base);
     }
      
    
