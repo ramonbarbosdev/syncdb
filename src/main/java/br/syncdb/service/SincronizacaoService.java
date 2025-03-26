@@ -64,6 +64,8 @@ public class SincronizacaoService
 
             conexaoLocal.setAutoCommit(false); //banco NÃO faz o COMMIT automaticamente 
 
+            dadosService.desativarConstraints(conexaoLocal);
+
             processarSincronizacao(conexaoCloud, conexaoLocal, tabela, response);
             
             conexaoLocal.commit();

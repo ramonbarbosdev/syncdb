@@ -418,8 +418,6 @@ public class DadosService
     
     public void processarCargaTabelas(Connection conexaoCloud, Connection conexaoLocal, List<String> tabelas, Map<String, Object> response) throws SQLException
     {
-        desativarConstraints(conexaoLocal);
-
         tabelas.forEach(tabela ->
         {
             try
@@ -448,7 +446,7 @@ public class DadosService
                     System.out.println("Dados da tabela "+tabela+" já sincronizados" );
                 }
 
-                validarTabelaIndividual(conexaoLocal, tabela, response);
+                // validarTabelaIndividual(conexaoLocal, tabela, response);
             }
             catch (SQLException e)
             {
