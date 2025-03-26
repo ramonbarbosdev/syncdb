@@ -64,21 +64,21 @@ public class SincronizacaoService
 
             response.put("success", true);
 
-            String pkColumn = dadosService.obterColunaPK(conexaoCloud, tabela);
+            String pkColumn = dadosService.obterNomeColunaPK(conexaoCloud, tabela);
             long maxCloudId = dadosService.obterMaxId(conexaoCloud, tabela, pkColumn);
             long maxLocalId = dadosService.obterMaxId(conexaoLocal, tabela, pkColumn);
 
             if (maxLocalId == 0)
             {
-                dadosService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela);
+                dadosService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
             }
             else if (maxCloudId > maxLocalId)
             {
-                dadosService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId);
+                dadosService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId,response);
             }
             else
             {
-                System.out.println("Tabela " + tabela + " já está sincronizada");
+                response.put("message", "Tabela " + tabela + " já está sincronizada");
             }
 
         }

@@ -6,24 +6,20 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
 @Service
 public class DadosService {
     
-    /**
-     * Obtém o valor máximo da coluna especificada em uma tabela
-     * @param conn Conexão com o banco de dados
-     * @param tabela Nome da tabela
-     * @param nomeColuna Nome da coluna (normalmente a PK)
-     * @return Valor máximo da coluna, ou 0 se a tabela estiver vazia
-     * @throws SQLException
-     */
-    public long obterMaxId(Connection conn, String tabela, String nomeColuna) throws SQLException {
-        // Se a coluna não for especificada, tenta obter a PK automaticamente
-        if (nomeColuna == null || nomeColuna.isEmpty()) {
-            nomeColuna = obterColunaPK(conn, tabela);
+    
+    public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
+    {
+       
+        if (nomeColuna == null || nomeColuna.isEmpty())
+        {
+            nomeColuna = obterNomeColunaPK(conexao, tabela);
             if (nomeColuna == null) {
                 throw new SQLException("Não foi possível identificar a coluna para obter o máximo ID");
             }
@@ -31,21 +27,23 @@ public class DadosService {
 
         String sql = String.format("SELECT COALESCE(MAX(%s), 0) FROM %s", nomeColuna, tabela);
         
-        try (PreparedStatement stmt = conn.prepareStatement(sql);
-            ResultSet rs = stmt.executeQuery()) {
+        try (PreparedStatement stmt = conexao.prepareStatement(sql);
+            ResultSet rs = stmt.executeQuery())
+            {
             
-            if (rs.next()) {
+            if (rs.next())
+            {
                 return rs.getLong(1);
             }
             return 0;
         }
     }
 
-/**
- * Método auxiliar para obter o nome da coluna de chave primária
- */
-    public String obterColunaPK(Connection conn, String tabela) throws SQLException {
-        try (ResultSet rs = conn.getMetaData().getPrimaryKeys(null, null, tabela)) {
+
+    public String obterNomeColunaPK(Connection conexao, String tabela) throws SQLException
+    {
+        try (ResultSet rs = conexao.getMetaData().getPrimaryKeys(null, null, tabela))
+        {
             if (rs.next()) {
                 return rs.getString("COLUMN_NAME");
             }
@@ -53,12 +51,13 @@ public class DadosService {
         }
     }
 
-    public void cargaInicialCompleta(Connection cloudConn, Connection localConn, String tabela) throws SQLException {
+    public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela, Map<String, Object> response) throws SQLException
+    {
         final int BATCH_SIZE = 1000;
         final int PAGE_SIZE = 50000;
         long offset = 0;
         
-        try (java.sql.Statement cloudStmt = cloudConn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY))
+        try (java.sql.Statement cloudStmt = conexaoCloud.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY))
         {
             cloudStmt.setFetchSize(BATCH_SIZE);
 
@@ -72,10 +71,10 @@ public class DadosService {
                     if (rs.isBeforeFirst())
                     {
                 
-                        PreparedStatement localInsert = criarPreparedInsert(localConn, tabela, rs.getMetaData());
+                        PreparedStatement localInsert = criarPreparedInsert(conexaoLocal, tabela, rs.getMetaData());
 
                         int batchCount = 0;
-                        localConn.setAutoCommit(false);
+                        conexaoLocal.setAutoCommit(false);
 
                         while (rs.next())
                         {
@@ -85,14 +84,14 @@ public class DadosService {
                             if (++batchCount % BATCH_SIZE == 0)
                             {
                                 localInsert.executeBatch();
-                                localConn.commit();
+                                conexaoLocal.commit();
                             }
                         }
 
                         if (batchCount > 0)
                         {
                             localInsert.executeBatch();
-                            localConn.commit();
+                            conexaoLocal.commit();
                         }
 
                         localInsert.close();
@@ -107,34 +106,38 @@ public class DadosService {
                     }
                 }
             }
+
+            response.put("message", "Sincronização concluida.");
+
         }
         catch (SQLException e)
         {
-            localConn.rollback();
+            conexaoLocal.rollback();
             throw e;
         }
     }
     
-    public void sincronizacaoIncremental(Connection cloudConn, Connection localConn, 
-                                        String tabela, String pkColumn, long maxLocalId) throws SQLException
+    public void sincronizacaoIncremental(Connection conexaoCloud, Connection conexaoLocal, 
+        String tabela,
+        String pkColumn,
+        long maxLocalId,
+        Map<String, Object> response
+    ) throws SQLException
     {
         final int BATCH_SIZE = 1000;
         
         String query = String.format("SELECT * FROM %s WHERE %s > ? ORDER BY %s", 
                                 tabela, pkColumn, pkColumn);
         
-        try (PreparedStatement cloudStmt = cloudConn.prepareStatement(query, 
-                                        ResultSet.TYPE_FORWARD_ONLY, 
-                                        ResultSet.CONCUR_READ_ONLY))
+        try (PreparedStatement cloudStmt = conexaoCloud.prepareStatement(query,  ResultSet.TYPE_FORWARD_ONLY,  ResultSet.CONCUR_READ_ONLY))
         {
             cloudStmt.setFetchSize(1000);
             cloudStmt.setLong(1, maxLocalId);
             
-            try (ResultSet rs = cloudStmt.executeQuery();
-                PreparedStatement localInsert = criarPreparedInsert(localConn, tabela, rs.getMetaData()))
+            try (ResultSet rs = cloudStmt.executeQuery();  PreparedStatement localInsert = criarPreparedInsert(conexaoLocal, tabela, rs.getMetaData()))
             {
                 
-                localConn.setAutoCommit(false);
+                conexaoLocal.setAutoCommit(false);
                 int batchCount = 0;
                 
                 while (rs.next())
@@ -145,17 +148,19 @@ public class DadosService {
                     if (++batchCount % BATCH_SIZE == 0)
                     {
                         localInsert.executeBatch();
-                        localConn.commit();
+                        conexaoLocal.commit();
                     }
                 }
                 
                 localInsert.executeBatch();
-                localConn.commit();
+                conexaoLocal.commit();
+                response.put("message", "Sincronização incremental concluida.");
+
             }
         }
     }
 
-    public PreparedStatement criarPreparedInsert(Connection conn, String tabela, ResultSetMetaData meta) throws SQLException
+    public PreparedStatement criarPreparedInsert(Connection conexao, String tabela, ResultSetMetaData meta) throws SQLException
     {
         StringBuilder sql = new StringBuilder("INSERT INTO ").append(tabela).append(" (");
         StringBuilder values = new StringBuilder("VALUES (");
@@ -174,7 +179,7 @@ public class DadosService {
         
         sql.append(") ").append(values).append(")");
         
-        return conn.prepareStatement(sql.toString());
+        return conexao.prepareStatement(sql.toString());
     }
 
     public void preencherPreparedStatement(PreparedStatement stmt, ResultSet rs) throws SQLException
