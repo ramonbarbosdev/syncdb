@@ -17,6 +17,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -295,11 +297,16 @@ public class EstruturaService {
        
     }
 
-    public boolean compararEstruturaTabelas(Connection cloudConn, Connection localConn, String tabela) {
-        // Implementar comparação de estrutura das tabelas
-        // Retornar true se estruturas forem compatíveis
+    public  Set<String> obterTabelas(Connection conexao, String base) throws InterruptedException, ExecutionException, TimeoutException
+    {
+        CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync
+        (() -> 
+            databaseService.obterTabelaMetaData(base, conexao)
+        );
 
-        return true;
+        Set<String> tabelas = futureCloud.get(5, TimeUnit.MINUTES);
+
+        return tabelas;
     }
 
 }

@@ -57,6 +57,10 @@ public class SincronizacaoService
             Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
 
+            
+            Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
+            
+           
             if(databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, tabela) != null)
             {
                 throw new SQLException("Estrutura das tabelas divergente");
@@ -78,7 +82,7 @@ public class SincronizacaoService
             }
             else
             {
-                response.put("message", "Tabela " + tabela + " já está sincronizada");
+                response.put("message", "Dados da tabela " + tabela + " já está sincronizada");
             }
 
         }
@@ -105,26 +109,16 @@ public class SincronizacaoService
             Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
 
-            CompletableFuture<Set<String>> futureLocal = CompletableFuture.supplyAsync
-            (() -> 
-                databaseService.obterTabelaMetaData(base, conexaoLocal)
-            );
-
-            CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync
-            (() -> 
-                databaseService.obterTabelaMetaData(base, conexaoCloud)
-            );
-            
-            Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);
-            Set<String> nomeTabelaCloud = futureCloud.get(5, TimeUnit.MINUTES);
+            Set<String> tabelasLocal = estruturaService.obterTabelas(conexaoLocal, base);
+            Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
 
             if(nomeTabela == null)
             {
-                estruturaService.processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response,base, null);
+                estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, response,base, null);
             }
             else
             {
-                estruturaService.processarTabelas(conexaoCloud, conexaoLocal, nomeTabelaCloud, nomeTabelaLocal, response,base, nomeTabela);
+                estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, response,base, nomeTabela);
             }
            
         }
