@@ -314,7 +314,7 @@ public class EstruturaService {
     {
         if (tabela != null && databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, tabela) != null)
         {
-        throw new SQLException("Estrutura da tabela " + tabela + " divergente entre cloud e local");
+            throw new SQLException("Estrutura da tabela " + tabela + " divergente entre cloud e local");
         }
     }
 

@@ -30,6 +30,9 @@ public class DadosService
 
     @Autowired
     private CicloService cicloService;
+
+    @Autowired
+    private EstruturaService estruturaService;
     
     
     public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
@@ -126,7 +129,6 @@ public class DadosService
             }
 
             // response.put("message", "Sincronização da tabela "+tabela+" concluida.");
-           System.out.println("Sincronização da tabela "+tabela+" concluida.");
 
         }
         catch (SQLException e)
@@ -174,7 +176,6 @@ public class DadosService
                 localInsert.executeBatch();
                 conexaoLocal.commit();
                 // response.put("message", "Sincronização incremental concluida.");
-                System.out.println("Sincronização da tabela "+tabela+" concluida.");
 
             }
         }
@@ -371,15 +372,48 @@ public class DadosService
         }
     }
 
-    public List<String> filtrarTabelasRelevantes(String tabelaAlvo, List<String> ordemCarga, Map<String, Set<String>> dependencias)
+    public List<String> filtrarTabelasRelevantes(String tabela, List<String> ordemCarga, 
+    Map<String, Set<String>> dependencias)
     {
-        if (tabelaAlvo == null) return ordemCarga;
-        
+        Set<String> tabelasRelevantes = new LinkedHashSet<>();
+        Set<String> visitado = new HashSet<>();
+        Set<String> ciclo = new HashSet<>();
+
+        buscarDependencias(tabela, dependencias, tabelasRelevantes, visitado, ciclo);
+
         return ordemCarga.stream()
-            .filter(t -> t.equals(tabelaAlvo) || 
-                        dependencias.getOrDefault(tabelaAlvo, Collections.emptySet()).contains(t))
-            .collect(Collectors.toList());
-    }
+                        .filter(tabelasRelevantes::contains)
+                        .collect(Collectors.toList());
+
+        }
+
+        private void buscarDependencias(String tabela, Map<String, Set<String>> dependencias, 
+        Set<String> tabelasRelevantes, Set<String> visitado, Set<String> ciclo)
+        {
+
+            if (ciclo.contains(tabela))
+            {
+                System.out.println("Ciclo detectado em: " + tabela);
+
+                dependencias.getOrDefault(tabela, new HashSet<>()).clear();
+                // return;
+            }
+            if (visitado.contains(tabela))
+            {
+                return;
+            }
+
+            visitado.add(tabela);
+            tabelasRelevantes.add(tabela);
+
+            if (dependencias.containsKey(tabela))
+            {
+                for (String dependente : dependencias.get(tabela))
+                {
+                    buscarDependencias(dependente, dependencias, tabelasRelevantes, visitado, ciclo);
+                }
+            }
+        }
 
     
     public void processarCargaTabelas(Connection conexaoCloud, Connection conexaoLocal, List<String> tabelas, Map<String, Object> response) throws SQLException
@@ -398,11 +432,15 @@ public class DadosService
                 {
                     cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
                     response.put(tabela + "_status", "CARGA_INICIAL_COMPLETA");
+                    System.out.println("Sincronização da tabela "+tabela+" concluida.");
+
                 } 
                 else if (maxCloudId > maxLocalId)
                 {
                     sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId, response);
                     response.put(tabela + "_status", "SINCRONIZACAO_INCREMENTAL");
+                    System.out.println("Sincronização da tabela "+tabela+" concluida.");
+
                 } 
                 else
                 {
@@ -410,11 +448,7 @@ public class DadosService
                     System.out.println("Dados da tabela "+tabela+" já sincronizados" );
                 }
 
-                if(tabela.contains("natureza_despesa"))
-                {
-
-                    validarTabelaIndividual(conexaoLocal, tabela, response);
-                }
+                validarTabelaIndividual(conexaoLocal, tabela, response);
             }
             catch (SQLException e)
             {
@@ -425,7 +459,7 @@ public class DadosService
             }
         });
 
-        validarIntegridadeFinal(conexaoLocal, response);
+        // validarIntegridadeFinal(conexaoLocal, response);
         
     }
 
@@ -453,9 +487,10 @@ public class DadosService
         List<Map<String, String>> problemas = new ArrayList<>();
         boolean integridadeOk = true;
         
-        // Obter todas as FKs da tabela
         DatabaseMetaData meta = conn.getMetaData();
-        try (ResultSet rs = meta.getImportedKeys(conn.getCatalog(), null, tabela)) {
+        String catalog = conn.getCatalog();
+        
+        try (ResultSet rs = meta.getImportedKeys(catalog, null, tabela)) {
             while (rs.next()) {
                 String fkName = rs.getString("FK_NAME");
                 String fkColumn = rs.getString("FKCOLUMN_NAME");
@@ -463,15 +498,14 @@ public class DadosService
                 String pkColumn = rs.getString("PKCOLUMN_NAME");
                 
                 try {
-                    // Verificar registros inconsistentes
+                    // Usa JOIN para melhorar performance
                     String query = String.format(
-                        "SELECT COUNT(*) FROM %s t WHERE t.%s IS NOT NULL " +
-                        "AND NOT EXISTS (SELECT 1 FROM %s r WHERE t.%s = r.%s)", 
-                        tabela, fkColumn, pkTable, fkColumn, pkColumn);
+                        "SELECT COUNT(*) FROM %s t LEFT JOIN %s r ON t.%s = r.%s " +
+                        "WHERE t.%s IS NOT NULL AND r.%s IS NULL", 
+                        tabela, pkTable, fkColumn, pkColumn, fkColumn, pkColumn);
                     
                     try (java.sql.Statement stmt = conn.createStatement();
                          ResultSet countRs = stmt.executeQuery(query)) {
-                        
                         if (countRs.next() && countRs.getInt(1) > 0) {
                             Map<String, String> problema = new HashMap<>();
                             problema.put("constraint", fkName);
@@ -480,11 +514,23 @@ public class DadosService
                             problema.put("registros_inconsistentes", String.valueOf(countRs.getInt(1)));
                             problemas.add(problema);
                             integridadeOk = false;
+    
+                            // Mostra os registros inconsistentes para debug
+                            String queryDetalhada = String.format(
+                                "SELECT t.%s FROM %s t LEFT JOIN %s r ON t.%s = r.%s " +
+                                "WHERE t.%s IS NOT NULL AND r.%s IS NULL LIMIT 5", 
+                                fkColumn, tabela, pkTable, fkColumn, pkColumn, fkColumn, pkColumn);
+    
+                            try (ResultSet rsDetalhado = stmt.executeQuery(queryDetalhada)) {
+                                while (rsDetalhado.next()) {
+                                    System.out.println("Inconsistência encontrada: " + rsDetalhado.getString(1));
+                                }
+                            }
                         }
                     }
                 } catch (SQLException e) {
                     Map<String, String> erro = new HashMap<>();
-                    erro.put("erro", "Falha ao validar FK " + fkName + ": " + e.getMessage());
+                    erro.put("erro", String.format("Falha ao validar FK '%s' (coluna '%s' -> tabela '%s'): %s", fkName, fkColumn, pkTable, e.getMessage()));
                     problemas.add(erro);
                     integridadeOk = false;
                 }
@@ -495,6 +541,7 @@ public class DadosService
         resultado.put("problemas", problemas);
         return resultado;
     }
+    
     
     private void validarIntegridadeFinal(Connection conn, Map<String, Object> response) throws SQLException {
         try

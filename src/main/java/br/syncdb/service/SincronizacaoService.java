@@ -54,12 +54,15 @@ public class SincronizacaoService
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
         
+       
+
+
         try
         {
             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-     
-            conexaoLocal.setAutoCommit(false);
+
+            conexaoLocal.setAutoCommit(false); //banco NÃO faz o COMMIT automaticamente 
 
             processarSincronizacao(conexaoCloud, conexaoLocal, tabela, response);
             
@@ -84,7 +87,7 @@ public class SincronizacaoService
     {
         estruturaService.validarEstruturaTabela(conexaoCloud, conexaoLocal, tabela);
         
-      
+        
         Map<String, Set<String>> dependencias = dadosService.obterDependenciasTabelas(conexaoCloud);
 
         List<String> ordemCarga = dadosService.ordenarTabelasPorDependencia(dependencias);
@@ -93,7 +96,6 @@ public class SincronizacaoService
         {
             ordemCarga = dadosService.filtrarTabelasRelevantes(tabela, ordemCarga, dependencias);
         }
-        
      
         dadosService.processarCargaTabelas(conexaoCloud, conexaoLocal, ordemCarga, response);
         
@@ -165,11 +167,14 @@ public class SincronizacaoService
     {
         if (conexaoLocal != null)
         {
-            try {
+            try
+            {
                 conexaoLocal.rollback();
-            } catch (SQLException ex) {
-                System.out.println("Erro ao fazer rollback "+ex );
+                System.out.println("rollback");
 
+            } catch (SQLException ex)
+            {
+                System.out.println("Erro ao fazer rollback "+ex );
             }
         }
         
@@ -178,7 +183,7 @@ public class SincronizacaoService
         response.put("message", "Erro durante sincronização");
         response.put("details", e.getMessage());
         
-        System.out.println("Erro na sincronização "+e );
+        // System.out.println("Erro na sincronização "+e );
 
     }
     
@@ -188,14 +193,14 @@ public class SincronizacaoService
         {
             if (conexaoLocal != null && !conexaoLocal.isClosed())
             {
-                conexaoLocal.setAutoCommit(true); // Restaura auto-commit
+                conexaoLocal.setAutoCommit(true); // banco faz o COMMIT automaticamente 
             }
         }
         catch (SQLException e)
         {
             System.out.println("Erro ao restaurar auto-commit "+e );
         }
-        
+        // System.out.println("fechar");
         ConexaoBanco.fecharTodos();
     }
      
