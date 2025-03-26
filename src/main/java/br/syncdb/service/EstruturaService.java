@@ -110,13 +110,12 @@ public class EstruturaService {
         queries.put("Chaves Estrangeiras",chavesEstrangeiras);
         queries.put("Alterações",alteracoes);
         // queries.put("Criação de Tabelas", funcoes);
-
         
         executarQueriesEmLotes(conexaoLocal, queries, response);
         
-        queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
+        // queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
 
-        response.put("pastaQueries", diretorio.getAbsolutePath());
+        // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
     private void processarTabelaIndividual(Connection conexaoCloud, Connection conexaoLocal,
@@ -126,8 +125,6 @@ public class EstruturaService {
         List<String> chavesEstrangeiras,
         List<String> alteracoes)
     {
-
-        
         try
         {
             if (!nomeTabelaLocal.contains(nomeTabela))

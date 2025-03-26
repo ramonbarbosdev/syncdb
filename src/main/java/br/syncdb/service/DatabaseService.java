@@ -150,11 +150,11 @@ public class DatabaseService
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
         
-        // identificar colunas serial primeiro
         Map<String, String> serialColumns = new HashMap<>();
         try (PreparedStatement stmt = conexao.prepareStatement(
                 "SELECT column_name, column_default FROM information_schema.columns " +
-                "WHERE table_name = ? AND column_default LIKE 'nextval%'")) {
+                "WHERE table_name = ? AND column_default LIKE 'nextval%'"))
+        {
             stmt.setString(1, nomeTabela);
             ResultSet rs = stmt.executeQuery();
             while (rs.next())
@@ -183,7 +183,14 @@ public class DatabaseService
                 //tratamento para colunas serial
                 if (serialColumns.containsKey(colName))
                 {
-                    createTableScript.append("integer"); 
+                    if(typeName.contains("serial"))
+                    {
+                        createTableScript.append("integer"); 
+                    }
+                    else
+                    {
+                        createTableScript.append(typeName);
+                    }
                 }
                 else
                 {

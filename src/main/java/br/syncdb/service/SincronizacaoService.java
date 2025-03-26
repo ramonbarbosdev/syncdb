@@ -53,10 +53,7 @@ public class SincronizacaoService
         Map<String, Object> response = new LinkedHashMap<>(); 
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
-        
-       
-
-
+     
         try
         {
             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
@@ -117,14 +114,8 @@ public class SincronizacaoService
             Set<String> tabelasLocal = estruturaService.obterTabelas(conexaoLocal, base);
             Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
 
-            if(nomeTabela == null)
-            {
-                estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, response,base, null);
-            }
-            else
-            {
-                estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, response,base, nomeTabela);
-            }
+            estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, response,base, nomeTabela);
+
            
         }
         catch (SQLException e)
