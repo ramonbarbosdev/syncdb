@@ -112,7 +112,7 @@ public class SincronizacaoService
 
             CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync
             (() -> 
-            databaseService.obterTabelaMetaData(base, conexaoCloud)
+                databaseService.obterTabelaMetaData(base, conexaoCloud)
             );
             
             Set<String> nomeTabelaLocal = futureLocal.get(5, TimeUnit.MINUTES);

@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.UsuarioDTO;
+import br.syncdb.config.TabelaCacheManager;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
 import br.syncdb.service.DatabaseService;
@@ -36,21 +37,12 @@ import br.syncdb.service.SincronizacaoService;
 @RequestMapping(value = "/sincronizacao")
 public class SincronizacaoController
 {
-	@Autowired
-	private DatabaseService databaseService;
+
 
 	@Autowired
 	private SincronizacaoService sincronizacaoService;
 	
-    // @GetMapping(value = "/base", produces = "application/json")
-	// public ResponseEntity<List<?>> listaBase () 
-	// {
 
-	// 	List lista = databaseService.listDatabases();
-	
-	// 	return new ResponseEntity<>(lista, HttpStatus.OK);
-
-	// }
 	
     @GetMapping(value = "/estrutura/{base}", produces = "application/json")
 	public ResponseEntity<?> sincronizacaoEstruturaTotal ( @PathVariable (value = "base") String base ) 
@@ -106,6 +98,12 @@ public class SincronizacaoController
 		}
 
 
+	}
+
+	@GetMapping("/cache/stats")
+	public Map<String, Object> getCacheStats()
+	{
+		return TabelaCacheManager.getEstatisticasCache();
 	}
    
 
