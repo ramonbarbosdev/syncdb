@@ -193,7 +193,7 @@ public class SincronizacaoService
             System.out.println("Erro ao restaurar auto-commit "+e );
         }
         // System.out.println("fechar");
-        ConexaoBanco.fecharConexao(base);
+        ConexaoBanco.fecharTodos();
     }
      
    
