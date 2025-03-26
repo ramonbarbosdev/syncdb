@@ -50,64 +50,57 @@ public class SincronizacaoService
 
     public Map<String, Object> sincronizarDados(String base, String tabela)
     {
-        Map<String, Object> response = new HashMap<>();
-
+        Map<String, Object> response = new LinkedHashMap<>(); 
+        Connection conexaoCloud = null;
+        Connection conexaoLocal = null;
+        
         try
         {
-            Connection conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            Connection conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+     
+            conexaoLocal.setAutoCommit(false);
 
-
-            if(databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, tabela) != null)
-            {
-                throw new SQLException("Estrutura das tabelas divergente");
-            }
-
+            processarSincronizacao(conexaoCloud, conexaoLocal, tabela, response);
             
-            
-            Map<String, Set<String>> dependencias = dadosService.obterDependenciasTabelas(conexaoCloud);
-            
-            List<String> ordemCarga = dadosService.ordenarTabelasPorDependencia(dependencias);
-
-           for (String tabelaOrdenada : ordemCarga)
-           {
-              
-                // String pkColumn = dadosService.obterNomeColunaPK(conexaoCloud, tabelaOrdenada);
-                // long maxCloudId = dadosService.obterMaxId(conexaoCloud, tabelaOrdenada, pkColumn);
-                // long maxLocalId = dadosService.obterMaxId(conexaoLocal, tabelaOrdenada, pkColumn);
-
-                // if (maxLocalId == 0)
-                // {
-                //     dadosService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabelaOrdenada, response);
-                // }
-                // else if (maxCloudId > maxLocalId)
-                // {
-                //     dadosService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabelaOrdenada, pkColumn, maxLocalId,response);
-                // }
-                // else
-                // {
-                //     // response.put("message", "Dados da tabela " + tabela + " já está sincronizada");
-                //     System.out.println( "Dados da tabela " + tabelaOrdenada + " já está sincronizada");
-                // }
-           }
-
+            conexaoLocal.commit();
             response.put("success", true);
-
+            
         }
         catch (Exception e)
         {
-            response.put("success", false);
-            response.put("errorType", "UNEXPECTED_ERROR");
-            response.put("message", "Erro inesperado durante sincronização");
-            response.put("details", e.getClass().getSimpleName() + ": " + e.getMessage());
+            tratarErroSincronizacao(response, conexaoLocal, e);
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            finalizarConexoes(conexaoCloud, conexaoLocal);
         }
+        
         return response;
     }
+    
+    private void processarSincronizacao(Connection conexaoCloud, Connection conexaoLocal, 
+                                       String tabela, Map<String, Object> response) throws SQLException
+    {
+        estruturaService.validarEstruturaTabela(conexaoCloud, conexaoLocal, tabela);
+        
+      
+        Map<String, Set<String>> dependencias = dadosService.obterDependenciasTabelas(conexaoCloud);
+
+        List<String> ordemCarga = dadosService.ordenarTabelasPorDependencia(dependencias);
+
+        if (tabela != null)
+        {
+            ordemCarga = dadosService.filtrarTabelasRelevantes(tabela, ordemCarga, dependencias);
+        }
+        
      
+        dadosService.processarCargaTabelas(conexaoCloud, conexaoLocal, ordemCarga, response);
+        
+        // dadosService.validarIntegridadeDados(conexaoLocal, response);
+    }
+    
+
     public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela )
     {
         Map<String, Object> response = new HashMap<>();
@@ -167,6 +160,44 @@ public class SincronizacaoService
         return response;
     }
 
+    
+    private void tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)
+    {
+        if (conexaoLocal != null)
+        {
+            try {
+                conexaoLocal.rollback();
+            } catch (SQLException ex) {
+                System.out.println("Erro ao fazer rollback "+ex );
 
+            }
+        }
+        
+        response.put("success", false);
+        response.put("errorType", e.getClass().getSimpleName());
+        response.put("message", "Erro durante sincronização");
+        response.put("details", e.getMessage());
+        
+        System.out.println("Erro na sincronização "+e );
+
+    }
+    
+    private void finalizarConexoes(Connection conexaoCloud, Connection conexaoLocal)
+    {
+        try
+        {
+            if (conexaoLocal != null && !conexaoLocal.isClosed())
+            {
+                conexaoLocal.setAutoCommit(true); // Restaura auto-commit
+            }
+        }
+        catch (SQLException e)
+        {
+            System.out.println("Erro ao restaurar auto-commit "+e );
+        }
+        
+        ConexaoBanco.fecharTodos();
+    }
+     
    
 }

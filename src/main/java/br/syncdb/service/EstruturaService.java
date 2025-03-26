@@ -309,4 +309,13 @@ public class EstruturaService {
         return tabelas;
     }
 
+    public void validarEstruturaTabela(Connection conexaoCloud, Connection conexaoLocal, 
+    String tabela) throws SQLException
+    {
+        if (tabela != null && databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, tabela) != null)
+        {
+        throw new SQLException("Estrutura da tabela " + tabela + " divergente entre cloud e local");
+        }
+    }
+
 }

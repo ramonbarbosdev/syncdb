@@ -99,6 +99,24 @@ public class SincronizacaoController
 
 
 	}
+    @GetMapping(value = "/dados/{base}", produces = "application/json")
+	public ResponseEntity<?> sincronizacaoDadosTotal ( @PathVariable (value = "base") String base ) 
+	{
+	
+		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  null);
+
+		if ((Boolean) resultado.get("success"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
+
+
+	}
 
 	@GetMapping("/cache/stats")
 	public Map<String, Object> getCacheStats()
