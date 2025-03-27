@@ -354,13 +354,15 @@ public class DatabaseService
     }
 
 
-    public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException {
+    public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException
+    {
         StringBuilder createForeignKeyScript = new StringBuilder();
         
         DatabaseMetaData metaData = conexao.getMetaData();
         ResultSet foreignKeyResultSet = metaData.getImportedKeys(null, "public", nomeTabela);
     
-        while (foreignKeyResultSet.next()) {
+        while (foreignKeyResultSet.next())
+        {
             String constraintName = foreignKeyResultSet.getString("FK_NAME");
             String columnName = foreignKeyResultSet.getString("FKCOLUMN_NAME");
             String foreignTableName = foreignKeyResultSet.getString("PKTABLE_NAME");
@@ -374,8 +376,8 @@ public class DatabaseService
                                       .append(" ADD CONSTRAINT ").append(constraintName)
                                       .append(" FOREIGN KEY (").append(columnName).append(")")
                                       .append(" REFERENCES ").append(foreignTableName)
-                                      .append(" (").append(foreignColumnName).append(")")
-                                      .append(" ON DELETE CASCADE ON UPDATE CASCADE;\n");
+                                      .append(" (").append(foreignColumnName).append(");\n");
+                                    //   .append(" ON DELETE CASCADE ON UPDATE CASCADE;\n");
             }
         }
     

@@ -65,6 +65,7 @@ public class SincronizacaoService
 
             processarSincronizacao(conexaoCloud, conexaoLocal, tabela, response);
             
+            dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
             response.put("success", true);
             
@@ -183,6 +184,7 @@ public class SincronizacaoService
     {
         try
         {
+          
             if (conexaoLocal != null && !conexaoLocal.isClosed())
             {
                 conexaoLocal.setAutoCommit(true); // banco faz o COMMIT automaticamente 
@@ -193,6 +195,7 @@ public class SincronizacaoService
             System.out.println("Erro ao restaurar auto-commit "+e );
         }
         // System.out.println("fechar");
+        
         ConexaoBanco.fecharTodos();
     }
      

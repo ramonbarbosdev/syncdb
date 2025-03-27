@@ -19,8 +19,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import jakarta.persistence.criteria.CriteriaBuilder;
 
 @Service
 public class DadosService
@@ -38,6 +43,8 @@ public class DadosService
     public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
     {
        
+        // DSLContext create = DSL.using(conexao, SQLDialect.POSTGRES);
+
         if (nomeColuna == null || nomeColuna.isEmpty())
         {
             nomeColuna = obterNomeColunaPK(conexao, tabela);
@@ -46,6 +53,12 @@ public class DadosService
             }
         }
 
+        // return create
+        //     .select(DSL.coalesce(DSL.max(DSL.field(nomeColuna)), 0))
+        //     .from(DSL.table(tabela))
+        //     .fetchOne(0, Long.class);
+
+        //TODO: achar um jeito de sempre retornar o registro mais rescente
         String sql = String.format("SELECT COALESCE(MAX(%s), 0) FROM %s", nomeColuna, tabela);
         
         try (PreparedStatement stmt = conexao.prepareStatement(sql);
@@ -276,7 +289,7 @@ public class DadosService
         try (java.sql.Statement stmt = conn.createStatement())
         {
             // Reativa todas as constraints
-            stmt.execute("SET session_replication_role = default");
+            stmt.execute("SET session_replication_role = origin");
         }
     }
 
