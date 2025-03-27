@@ -42,35 +42,23 @@ public class DadosService
     
     public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
     {
-       
-        // DSLContext create = DSL.using(conexao, SQLDialect.POSTGRES);
+    
+        DSLContext create = DSL.using(conexao, SQLDialect.POSTGRES);
 
-        if (nomeColuna == null || nomeColuna.isEmpty())
-        {
+        if (nomeColuna == null || nomeColuna.isEmpty()) {
             nomeColuna = obterNomeColunaPK(conexao, tabela);
             if (nomeColuna == null) {
                 throw new SQLException("Não foi possível identificar a coluna para obter o máximo ID");
             }
         }
-
-        // return create
-        //     .select(DSL.coalesce(DSL.max(DSL.field(nomeColuna)), 0))
-        //     .from(DSL.table(tabela))
-        //     .fetchOne(0, Long.class);
-
-        //TODO: achar um jeito de sempre retornar o registro mais rescente
-        String sql = String.format("SELECT COALESCE(MAX(%s), 0) FROM %s", nomeColuna, tabela);
-        
-        try (PreparedStatement stmt = conexao.prepareStatement(sql);
-            ResultSet rs = stmt.executeQuery())
-            {
-            
-            if (rs.next())
-            {
-                return rs.getLong(1);
-            }
-            return 0;
-        }
+    
+        // Montando a query com jOOQ (SQLBuilder)
+        Long maxId = create
+                .select(DSL.coalesce(DSL.max(DSL.field(nomeColuna, Long.class)), 0L))
+                .from(DSL.table(tabela))
+                .fetchOneInto(Long.class);
+    
+        return maxId != null ? maxId : 0;
     }
 
 
