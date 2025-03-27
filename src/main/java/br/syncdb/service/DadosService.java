@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,8 +20,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+
 import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.Record1;
+import org.jooq.Result;
 import org.jooq.SQLDialect;
+import org.jooq.SelectJoinStep;
 import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -54,10 +60,11 @@ public class DadosService
     
         // Montando a query com jOOQ (SQLBuilder)
         Long maxId = create
-                .select(DSL.coalesce(DSL.max(DSL.field(nomeColuna, Long.class)), 0L))
-                .from(DSL.table(tabela))
-                .fetchOneInto(Long.class);
-    
+                    .select(DSL.coalesce(DSL.max(DSL.field(nomeColuna, Long.class)), 0L))
+                    .from(DSL.table(tabela))
+                    .fetchOneInto(Long.class);
+
+        
         return maxId != null ? maxId : 0;
     }
 
@@ -71,6 +78,15 @@ public class DadosService
             }
             return null;
         }
+    }
+    public int obterQuantidadeRegistro(Connection conexao, String tabela) throws SQLException
+    {
+        DSLContext create = DSL.using(conexao, SQLDialect.POSTGRES);
+
+        int count = create.fetchCount(DSL.table(tabela));
+        
+        return count;
+
     }
 
     public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela, Map<String, Object> response) throws SQLException
@@ -426,7 +442,9 @@ public class DadosService
                 String pkColumn = obterNomeColunaPK(conexaoCloud, tabela);
                 long maxCloudId = obterMaxId(conexaoCloud, tabela, pkColumn);
                 long maxLocalId = obterMaxId(conexaoLocal, tabela, pkColumn);
-    
+                int countCloud = obterQuantidadeRegistro(conexaoCloud, tabela);
+                int countLocal= obterQuantidadeRegistro(conexaoLocal, tabela);
+
                 if (maxLocalId == 0)
                 {
                     cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
@@ -434,9 +452,10 @@ public class DadosService
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
 
                 } 
-                else if (maxCloudId > maxLocalId)
+                else if (maxCloudId > maxLocalId || countCloud > countLocal)
                 {
                     sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId, response);
+                    verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, tabela, pkColumn);
                     response.put(tabela + "_status", "SINCRONIZACAO_INCREMENTAL");
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
 
@@ -541,25 +560,104 @@ public class DadosService
         return resultado;
     }
     
-    
-    private void validarIntegridadeFinal(Connection conn, Map<String, Object> response) throws SQLException {
-        try
+
+    public  Result<Record1<Object>> verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException 
+    {
+   
+        DSLContext createLocal = DSL.using(conexaoLocal, SQLDialect.POSTGRES);
+        DSLContext createCloud = DSL.using(conexaoCloud, SQLDialect.POSTGRES);
+
+        Set<Long> registrosLocal = new HashSet<>();
+        Set<Long> registrosCloud = new HashSet<>();
+
+        Result<Record1<Object>>  sqlLocal = createLocal
+                          .select(DSL.field(pkColumn))
+                          .from(DSL.table(tabela))
+                          .fetch();
+
+        Result<Record1<Object>> sqlCloud = createCloud
+                                            .select(DSL.field(pkColumn))
+                                            .from(DSL.table(tabela))
+                                            .fetch();
+
+
+        if(sqlLocal == null)
+         {
+            return null;
+        }
+        
+        for (Record1<Object> local : sqlLocal)
         {
-            ativarConstraints(conn);
+            registrosLocal.add(((Number) local.getValue(pkColumn)).longValue());
+        }
 
-         
-            Map<String, Object> validacao = validarIntegridadeComRelatorio(conn);
+        for(Record1<Object> cloud : sqlCloud)
+        {
+            registrosCloud.add(((Number) cloud.getValue(pkColumn)).longValue());
+        }
 
-            response.put("validacao_final", validacao);
+        Set<Long> registrosDesconhecidos = new HashSet<>(registrosLocal);
+        registrosDesconhecidos.removeAll(registrosCloud);
             
-            if (!(Boolean) validacao.getOrDefault("integridade_ok", true)) {
-                throw new SQLException("Problemas de integridade encontrados após carga completa");
+        if (!registrosDesconhecidos.isEmpty())
+        {
+                System.out.println("Registros não encontrados na base de dados remota: " + registrosDesconhecidos);
+        }
+
+        Set<Long> registrosExtras = new HashSet<>(registrosCloud);
+        registrosExtras.removeAll(registrosLocal);
+        
+        if (!registrosExtras.isEmpty())
+        {
+            System.out.println("Registros extras na base de dados remota: " + registrosExtras);
+        }
+        
+        return sqlLocal;
+     
+       
+    }
+
+    public void verificarConsistenciaDados(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException {
+        // 1. Obtenha os registros das duas bases de dados
+        String sqlLocal = String.format("SELECT * FROM %s WHERE %s = ?", tabela, pkColumn);
+        String sqlCloud = String.format("SELECT * FROM %s WHERE %s = ?", tabela, pkColumn);
+    
+        try (PreparedStatement stmtLocal = conexaoLocal.prepareStatement(sqlLocal);
+             PreparedStatement stmtCloud = conexaoCloud.prepareStatement(sqlCloud)) {
+    
+            // Supondo que o PK seja único, então pegamos o ID
+            stmtLocal.setLong(1, 123);  // Exemplo: ID de registro
+            stmtCloud.setLong(1, 123);
+    
+            try (ResultSet rsLocal = stmtLocal.executeQuery();
+                 ResultSet rsCloud = stmtCloud.executeQuery()) {
+    
+                // Verifica se o registro existe nas duas bases
+                if (rsLocal.next() && rsCloud.next()) {
+                    // Comparar todos os valores das colunas
+                    ResultSetMetaData rsMetaDataLocal = rsLocal.getMetaData();
+                    ResultSetMetaData rsMetaDataCloud = rsCloud.getMetaData();
+    
+                    int columnCount = rsMetaDataLocal.getColumnCount();
+    
+                    for (int i = 1; i <= columnCount; i++) {
+                        String columnName = rsMetaDataLocal.getColumnName(i);
+                        String localValue = rsLocal.getString(i);
+                        String cloudValue = rsCloud.getString(i);
+    
+                        if (!localValue.equals(cloudValue)) {
+                            System.out.println("Diferença encontrada na coluna: " + columnName + 
+                                               " | Base Local: " + localValue + " | Base Remota: " + cloudValue);
+                        }
+                    }
+                } else {
+                    System.out.println("Registro com ID " + 123 + " não encontrado em uma das bases.");
+                }
             }
-        } catch (SQLException e) {
-            System.out.println("Erro na validação final "+e );
-            throw e;
         }
     }
+    
+    
     
 
 }
