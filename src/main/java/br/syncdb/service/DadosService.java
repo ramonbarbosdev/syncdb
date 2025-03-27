@@ -165,7 +165,9 @@ public class DadosService
     {
         final int BATCH_SIZE = 1000;
         
-        String query = String.format("SELECT * FROM %s WHERE %s > ? ORDER BY %s", 
+        // String query = String.format("SELECT * FROM %s WHERE %s > ? ORDER BY %s", 
+        //                         tabela, pkColumn, pkColumn);
+        String query = String.format("SELECT * FROM %s WHERE %s = ? ORDER BY %s", 
                                 tabela, pkColumn, pkColumn);
         
         try (PreparedStatement cloudStmt = conexaoCloud.prepareStatement(query,  ResultSet.TYPE_FORWARD_ONLY,  ResultSet.CONCUR_READ_ONLY))
@@ -446,6 +448,7 @@ public class DadosService
                 int countCloud = obterQuantidadeRegistro(conexaoCloud, tabela);
                 int countLocal= obterQuantidadeRegistro(conexaoLocal, tabela);
 
+                
                 if (maxLocalId == 0)
                 {
                     cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
@@ -454,14 +457,12 @@ public class DadosService
                     response.put(tabela + "_status", "CARGA_INICIAL_COMPLETA");
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
                 } 
-                else if (maxCloudId > maxLocalId || countCloud > countLocal)
+                else if (maxCloudId > maxLocalId || countCloud != countLocal)
                 {
-                    sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId, response);
-                    verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, tabela, pkColumn);
-
+                    verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, tabela, pkColumn, response);
+                   
                     response.put(tabela + "_status", "SINCRONIZACAO_INCREMENTAL");
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
-
                 } 
                 else
                 {
@@ -564,9 +565,10 @@ public class DadosService
     }
     
 
-    public  Result<Record1<Object>> verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException 
+    public Long verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn, Map<String, Object> response) throws SQLException 
     {
-   
+        Long registroNovo = null;
+
         DSLContext createLocal = DSL.using(conexaoLocal, SQLDialect.POSTGRES);
         DSLContext createCloud = DSL.using(conexaoCloud, SQLDialect.POSTGRES);
 
@@ -583,8 +585,7 @@ public class DadosService
                                             .from(DSL.table(tabela))
                                             .fetch();
 
-
-        if(sqlLocal == null)
+        if(sqlLocal == null || sqlCloud == null)
          {
             return null;
         }
@@ -604,7 +605,7 @@ public class DadosService
             
         if (!registrosDesconhecidos.isEmpty())
         {
-                System.out.println("Registros não encontrados na base de dados remota: " + registrosDesconhecidos);
+            System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
         }
 
         Set<Long> registrosExtras = new HashSet<>(registrosCloud);
@@ -612,12 +613,14 @@ public class DadosService
         
         if (!registrosExtras.isEmpty())
         {
-            System.out.println("Registros extras na base de dados remota: " + registrosExtras);
+            System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
+            registroNovo = registrosExtras.iterator().next() ;
+            sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, registroNovo, response);
+
         }
         
-        return sqlLocal;
+        return registroNovo;
      
-       
     }
 
     public void verificarConsistenciaDados(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException {
@@ -674,8 +677,6 @@ public class DadosService
             "COALESCE((SELECT MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END) FROM %s), 1), false);",
             seq, pkColumn, pkColumn, nomeTabela);
 
-        System.out.println(query);
-
         try (java.sql.Statement statement = connection.createStatement())
         {
             statement.execute(query);
@@ -685,7 +686,6 @@ public class DadosService
             System.err.println("Erro ao atualizar sequência para a tabela: " + nomeTabela);
             e.printStackTrace();
         }
-    
     }
     
     
