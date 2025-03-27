@@ -46,11 +46,7 @@ public class DadosService
     private EstruturaService estruturaService;
     
     
-    public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
-    {
-    
-        DSLContext create = DSL.using(conexao, SQLDialect.POSTGRES);
-
+    public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException {
         if (nomeColuna == null || nomeColuna.isEmpty()) {
             nomeColuna = obterNomeColunaPK(conexao, tabela);
             if (nomeColuna == null) {
@@ -58,14 +54,19 @@ public class DadosService
             }
         }
     
-        // Montando a query com jOOQ (SQLBuilder)
-        Long maxId = create
-                    .select(DSL.coalesce(DSL.max(DSL.field(nomeColuna, Long.class)), 0L))
-                    .from(DSL.table(tabela))
-                    .fetchOneInto(Long.class);
-
+        // Consulta que verifica se o valor é numérico antes de calcular o máximo
+        String sql = String.format(
+            "SELECT COALESCE(MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END), 0) FROM %s", 
+            nomeColuna, nomeColuna, tabela);
         
-        return maxId != null ? maxId : 0;
+        try (PreparedStatement stmt = conexao.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 0;
+        }
     }
 
 
@@ -448,14 +449,16 @@ public class DadosService
                 if (maxLocalId == 0)
                 {
                     cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
+                    atualizarSequencias( conexaoLocal, tabela, pkColumn);
+
                     response.put(tabela + "_status", "CARGA_INICIAL_COMPLETA");
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
-
                 } 
                 else if (maxCloudId > maxLocalId || countCloud > countLocal)
                 {
                     sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, maxLocalId, response);
                     verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, tabela, pkColumn);
+
                     response.put(tabela + "_status", "SINCRONIZACAO_INCREMENTAL");
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
 
@@ -657,7 +660,64 @@ public class DadosService
         }
     }
     
+    public void atualizarSequencias(Connection connection, String nomeTabela, String pkColumn)
+    {
+        String seq = consultarSequenciasPorTabela(connection, nomeTabela);
+
+        if(seq == null) 
+        {
+            return ;
+        }
+    
+        String query = String.format(
+            "SELECT setval('%s', " +
+            "COALESCE((SELECT MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END) FROM %s), 1), false);",
+            seq, pkColumn, pkColumn, nomeTabela);
+
+        System.out.println(query);
+
+        try (java.sql.Statement statement = connection.createStatement())
+        {
+            statement.execute(query);
+        }
+        catch (SQLException e)
+        {
+            System.err.println("Erro ao atualizar sequência para a tabela: " + nomeTabela);
+            e.printStackTrace();
+        }
+    
+    }
     
     
+    public  String consultarSequenciasPorTabela(Connection connection, String nomeTabela)
+    {
+        String seq = null;
+
+        String query = "SELECT s.sequencename " +
+                       "FROM pg_sequences s " +
+                       "JOIN pg_class c ON c.relname = s.sequencename " +
+                       "JOIN pg_namespace n ON n.oid = c.relnamespace " +
+                       "WHERE n.nspname = 'public' " +
+                       "AND s.sequencename LIKE '" + nomeTabela + "_%_seq';";
+
+        try (java.sql.Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(query))
+        {
+
+            while (resultSet.next())
+            {
+                String sequenceName = resultSet.getString("sequencename");
+      
+                seq = sequenceName;
+                
+            }
+        }
+        catch (SQLException e)
+        {
+            e.printStackTrace();
+        }
+        
+        return seq != null ?  seq : null;
+    }
 
 }

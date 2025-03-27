@@ -55,6 +55,7 @@ public class EstruturaService {
         }
 
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
+        List<String> atualizacaoSequencias = Collections.synchronizedList(new ArrayList<>());
         List<String> funcoes = Collections.synchronizedList(new ArrayList<>());
         List<String> criacoesTabela = Collections.synchronizedList(new ArrayList<>());
         List<String> chavesEstrangeiras = Collections.synchronizedList(new ArrayList<>());
@@ -82,7 +83,7 @@ public class EstruturaService {
                     return; 
                 }
         
-                 processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes ,   response);
+                 processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes ,   atualizacaoSequencias,response);
               
 
             }, executor))
@@ -124,10 +125,13 @@ public class EstruturaService {
         List<String> criacoesTabela,
         List<String> chavesEstrangeiras,
         List<String> alteracoes,
+        List<String> atualizacaoSequencias,
         Map<String, Object> response)
     {
         try
         {
+
+           
             if (!nomeTabelaLocal.contains(nomeTabela))
             {
                 
@@ -196,7 +200,7 @@ public class EstruturaService {
     {
         
         response.put("success", true);
-        
+
         if (queries.isEmpty())
         {
             System.out.printf("[%s] Nenhuma query para executar.%n", tipo);

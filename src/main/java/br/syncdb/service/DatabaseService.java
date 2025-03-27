@@ -18,6 +18,9 @@ import java.util.StringJoiner;
 
 import javax.sql.DataSource;
 
+import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -287,6 +290,8 @@ public class DatabaseService
         return createTableScript.length() > 0 ?  createTableScript.toString() : null;
         
     }
+
+   
 
     private boolean sequenciaExiste(Connection conexao, String nomeSequencia) throws SQLException {
         String query = "SELECT COUNT(*) FROM pg_class WHERE relname = ? AND relkind = 'S'"; // 'S' para sequência
@@ -614,5 +619,7 @@ public class DatabaseService
                 nomeTabela, nomeColuna
             )));
     }
+
+   
 
 }
