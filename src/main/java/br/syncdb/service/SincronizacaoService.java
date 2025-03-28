@@ -46,34 +46,24 @@ public class SincronizacaoService
 
     @Autowired
     private DadosService dadosService;
-
-
+    
+    @Autowired
+    private OperacaoBancoService operacaoBancoService;
     public Map<String, Object> verificarAlteracaoRegistro(String base, String tabela)
     {
         Map<String, Object> response = new HashMap<String, Object>();
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
         
-
         try
         {
             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
             conexaoLocal.setAutoCommit(false);
 
-            Map<String,  List<String>>  tabelaOrganizada = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
-
-            if(tabelaOrganizada.get("incremento") != null)
-            {
-                for( String itemTabela : tabelaOrganizada.get("incremento"))
-                {
-                    dadosService.verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, response);
-                  
-
-                }
-
-            }
-
+            Map<String, Object>  querysOrganizada = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
+            response.put("objeto", querysOrganizada);
+            
             response.put("success", true);
         }
         catch (Exception e)
@@ -99,17 +89,16 @@ public class SincronizacaoService
         {
             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-
             conexaoLocal.setAutoCommit(false); //banco NÃO faz o COMMIT automaticamente 
 
             dadosService.desativarConstraints(conexaoLocal);
 
-            response = dadosService.processarSincronizacao(conexaoCloud, conexaoLocal, tabela);
+            Map<String, Object>  querysOrganizada = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
+            
             
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
             response.put("success", true);
-            
         }
         catch (Exception e)
         {

@@ -147,7 +147,8 @@ public class DadosService
     public Map<String, Object> carregarOrdemTabela(Connection conexaoCloud, Connection conexaoLocal, 
     String tabela) throws SQLException
     {
-        
+        System.out.println("Iniciando verificação de dados...");
+
         Map<String, Object> response = new LinkedHashMap<>(); 
         Map<String, Object> parametrosMap = new HashMap<String, Object>();
 
@@ -168,17 +169,6 @@ public class DadosService
         return parametrosMap;
     }
 
-    public Map<String, Object> processarSincronizacao(Connection conexaoCloud, Connection conexaoLocal, 
-    String tabela) throws SQLException
-    {
-        Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
-
-        processarCargaTabelas(conexaoCloud, conexaoLocal,(List<String>) parametrosMap.get("ordemCarga") , (Map<String, Object>) parametrosMap.get("response"));
-
-        return (Map<String, Object>) parametrosMap.get("response");
-    }
-
- 
 
    
     public void desativarConstraints(Connection conn) throws SQLException
@@ -380,89 +370,51 @@ public class DadosService
         return parametros;
     }
 
-    public  Map<String,  List<String>>  obterTabelasOrganizada(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+    public  Map<String, Object>  obterTabelasOrganizada(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
     {
+        Map<String, Object> retorno = new HashMap<String, Object>();
+        
         Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
         List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
-        Map<String,  List<String>> tabelaOrganizada = new LinkedHashMap<>(); 
-        tabelaOrganizada.put("novo", new ArrayList<>());
-        tabelaOrganizada.put("incremento", new ArrayList<>());
-        tabelaOrganizada.put("sincronizado", new ArrayList<>());
+        
+        Map<String,  List<String>> incrementoQuery = new LinkedHashMap<>(); 
+        List<String> novoQuery = new ArrayList<String>();
 
-        for(String tabelaCarga : tabelas)
-        {
-           
-            Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, tabelaCarga);
+        for(String itemTabela : tabelas)
+        {        
+            Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
 
             if(parametros != null)
             {
                 if ((Boolean) parametros.get("novo"))
                 {
-                    tabelaOrganizada.get("novo").add(tabelaCarga);
-                    System.out.println("Sincronização da tabela "+tabelaCarga+" concluida.");
+                    List<String> novosRegistros =  operacaoBancoService.registroNovo( conexaoCloud, itemTabela);
+                    novoQuery.addAll(novosRegistros);
+                    System.out.println("Script de criacao '"+itemTabela+"' concluida.");
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
-                    tabelaOrganizada.get("incremento").add(tabelaCarga);
-                    System.out.println("Sincronização da tabela "+tabelaCarga+" concluida.");
+                    Map<String, List<String>> resultadoIncremento = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela);
+        
+                    incrementoQuery.put(itemTabela, resultadoIncremento.get("insert")); 
+                    incrementoQuery.put(itemTabela, resultadoIncremento.get("delete")); 
+                    System.out.println("Script de alteração '"+itemTabela+"' concluida.");
                 } 
-                else
-                {
-                    tabelaOrganizada.get("sincronizado").add(tabelaCarga);
-                    System.out.println("Dados da tabela "+tabelaCarga+" já sincronizados" );
-                }
+                
             }
             
 
         }
 
-        return tabelaOrganizada;
+        retorno.put("incrementoQuery", incrementoQuery);
+        retorno.put("novoQuery", novoQuery);
+
+        return retorno;
             
     }
 
 
-    public void processarCargaTabelas(Connection conexaoCloud, Connection conexaoLocal, List<String> tabelas, Map<String, Object> response) throws SQLException
-    {
-        tabelas.forEach(tabela ->
-        {
-            try
-            {
-                Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, tabela);
-                
-                if ((Boolean) parametros.get("novo"))
-                {
-                    operacaoBancoService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
-                    atualizarSequencias( conexaoLocal, tabela);
-
-                    response.put(tabela + "_status", "CARGA_INICIAL_COMPLETA");
-                    System.out.println("Sincronização da tabela "+tabela+" concluida.");
-                } 
-                else if ((Boolean) parametros.get("existente"))
-                {
-                    verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, tabela, response);
-                   
-                    response.put(tabela + "_status", "SINCRONIZACAO_INCREMENTAL");
-                    System.out.println("Sincronização da tabela "+tabela+" concluida.");
-                } 
-                else
-                {
-                    response.put(tabela + "_status", "JA_SINCRONIZADA");
-                    System.out.println("Dados da tabela "+tabela+" já sincronizados" );
-                }
-
-            }
-            catch (SQLException e)
-            {
-                response.put(tabela + "_status", "ERRO");
-                response.put(tabela + "_erro", e.getMessage());
-                System.out.println("Erro ao sincronizar tabela "+tabela );
-
-            }
-        });
-
-        // validarIntegridadeFinal(conexaoLocal, response);
-        
-    }
+ 
 
 
     public void validarTabelaIndividual(Connection conn, String tabela, Map<String, Object> response) {
@@ -544,7 +496,7 @@ public class DadosService
     }
     
 
-    public void verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, Map<String, Object> response) throws SQLException 
+    public  Map<String,  List<String>> verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela) throws SQLException 
     {
         String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
         Long id;
@@ -571,7 +523,7 @@ public class DadosService
 
         if(sqlLocal == null || sqlCloud == null)
         {
-            return ;
+            return null ;
         }
         
         for (Record1<Object> local : sqlLocal)
@@ -589,7 +541,7 @@ public class DadosService
             
         if (!registrosDesconhecidos.isEmpty())
         {
-            System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
+            // System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
             id = registrosDesconhecidos.iterator().next() ;
             resutadoQuery.put("delete", operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
 
@@ -600,12 +552,12 @@ public class DadosService
         
         if (!registrosExtras.isEmpty())
         {
-            System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
+            // System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
             id = registrosExtras.iterator().next() ;
             resutadoQuery.put("insert", operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
         }
         
-     System.out.println(resutadoQuery);
+        return resutadoQuery;
      
     }
 

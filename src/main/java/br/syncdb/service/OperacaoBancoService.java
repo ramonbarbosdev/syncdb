@@ -69,6 +69,39 @@ public class OperacaoBancoService
 
     }
 
+    public List<String> registroNovo(Connection conexaoCloud, String tabela)
+    {
+        DSLContext dsl = DSL.using(conexaoCloud);
+        Table<Record> tabelaRecord = DSL.table(tabela);
+
+        Result<Record> resultados = dsl.select()
+                                    .from(tabela)
+                                    .fetch();
+
+        Record valores = resultados.iterator().next() ;
+
+        List<String> queryList = new ArrayList<>();
+
+        queryList.add(dsl.insertInto(tabelaRecord) 
+                                .columns(tabelaRecord.fields()) 
+                                .values(valores) 
+                                .getSQL(ParamType.INLINED)); 
+
+        return queryList;
+    }
+
+    public void executarConsulta(Connection connection, String sql)
+    {
+        DSLContext dsl = DSL.using(connection);
+
+        try {
+            int registrosAfetados = dsl.execute(sql);
+            System.out.println("Registros afetados: " + registrosAfetados);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela, Map<String, Object> response) throws SQLException
     {
         final int BATCH_SIZE = 1000;

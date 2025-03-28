@@ -124,8 +124,31 @@ public class SincronizacaoController
 		
 		Map<String, Object> resultado = sincronizacaoService.verificarAlteracaoRegistro(base,  tabela);
 
+		if ((Boolean) resultado.get("success"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
+	}
+    @GetMapping(value = "/verificardados/{base}", produces = "application/json")
+	public ResponseEntity<?> verificarAlteracaoRegistrosTotal(@PathVariable (value = "base") String base )
+	{
 		
-		return new ResponseEntity<>(resultado, HttpStatus.OK);
+		Map<String, Object> resultado = sincronizacaoService.verificarAlteracaoRegistro(base,  null);
+
+		if ((Boolean) resultado.get("success"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
 	}
 
 	@GetMapping("/cache/stats")
