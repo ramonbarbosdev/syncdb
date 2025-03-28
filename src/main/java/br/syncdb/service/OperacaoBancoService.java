@@ -5,7 +5,18 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+
+import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
+import org.jooq.Table;
+import org.jooq.conf.ParamType;
+import org.jooq.impl.DSL;
+import org.jooq.Record;
+import org.jooq.Result;
+import org.jooq.impl.SQLDataType;
 
 import org.springframework.stereotype.Service;
 
@@ -14,9 +25,48 @@ public class OperacaoBancoService
 {
     
 
-    public void registroDesconhecidos()
+    public List<String> registroDesconhecido(Connection connection, String tabela, Long id, String pkColumn )
     {
+        DSLContext dsl = DSL.using(connection);
+
+        Table<Record> tabelaRecord = DSL.table(tabela);
+
+        List<String>  queryList = new ArrayList<>();
         
+        String deleteQuery = dsl.delete(tabelaRecord)
+                                .where(DSL.field(pkColumn).eq(id))
+                                .getSQL(ParamType.INLINED)
+                                .toString();
+
+        queryList.add(deleteQuery);
+        // queryList.add(";\n");
+
+        return queryList;
+        
+    }
+    public List<String> registroExtra(Connection conexaoLocal, Connection conexaoCloud, String tabela, Long id, String pkColumn )
+    {
+        DSLContext dsl = DSL.using(conexaoCloud);
+        Table<Record> tabelaRecord = DSL.table(tabela);
+
+        Result<Record> resultados = dsl.select()
+                                    .from(tabela)
+                                    .where(DSL.field(pkColumn).eq(id))
+                                    .fetch();
+
+        Record valores = resultados.iterator().next() ;
+
+
+        List<String> queryList = new ArrayList<>();
+
+        queryList.add(dsl.insertInto(tabelaRecord) 
+                                .columns(tabelaRecord.fields()) 
+                                .values(valores) 
+                                .getSQL(ParamType.INLINED)); 
+        // queryList.add(";\n");
+
+        return queryList;
+
     }
 
     public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela, Map<String, Object> response) throws SQLException

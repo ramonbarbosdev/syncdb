@@ -547,6 +547,11 @@ public class DadosService
     public void verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, Map<String, Object> response) throws SQLException 
     {
         String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
+        Long id;
+
+        Map<String,  List<String>> resutadoQuery = new LinkedHashMap<>(); 
+        resutadoQuery.put("delete", new ArrayList<>());
+        resutadoQuery.put("insert", new ArrayList<>());
 
         DSLContext createLocal = DSL.using(conexaoLocal, SQLDialect.POSTGRES);
         DSLContext createCloud = DSL.using(conexaoCloud, SQLDialect.POSTGRES);
@@ -585,22 +590,22 @@ public class DadosService
         if (!registrosDesconhecidos.isEmpty())
         {
             System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
-            // registroNovo = registrosDesconhecidos.iterator().next() ;
+            id = registrosDesconhecidos.iterator().next() ;
+            resutadoQuery.put("delete", operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
 
         }
-
+        
         Set<Long> registrosExtras = new HashSet<>(registrosCloud);
         registrosExtras.removeAll(registrosLocal);
         
         if (!registrosExtras.isEmpty())
         {
             System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
-            // registroNovo = registrosExtras.iterator().next() ;
-            // operacaoBancoService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, registroNovo, response);
-
+            id = registrosExtras.iterator().next() ;
+            resutadoQuery.put("insert", operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
         }
         
-     
+     System.out.println(resutadoQuery);
      
     }
 
