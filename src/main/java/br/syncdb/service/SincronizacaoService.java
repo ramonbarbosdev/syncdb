@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -31,6 +32,7 @@ import java.util.Map.Entry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.syncdb.config.CacheManager;
 import br.syncdb.config.ConexaoBanco;
 import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
@@ -49,6 +51,9 @@ public class SincronizacaoService
     
     @Autowired
     private OperacaoBancoService operacaoBancoService;
+
+    private static final Map<String, Map<String, Object>> cache = new ConcurrentHashMap<>();
+
     public Map<String, Object> verificarAlteracaoRegistro(String base, String tabela)
     {
         Map<String, Object> response = new HashMap<String, Object>();
@@ -62,8 +67,13 @@ public class SincronizacaoService
             conexaoLocal.setAutoCommit(false);
 
             Map<String, Object>  querysOrganizada = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
+
+            cache.put(base, querysOrganizada);
+
             response.put("objeto", querysOrganizada);
-            
+
+      
+
             response.put("success", true);
         }
         catch (Exception e)
@@ -83,22 +93,33 @@ public class SincronizacaoService
        
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
-        Map<String, Object> response = null;
+        Map<String, Object> response = new HashMap<String, Object>();
 
+        
         try
         {
             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-            conexaoLocal.setAutoCommit(false); //banco NÃO faz o COMMIT automaticamente 
+            conexaoLocal.setAutoCommit(false);
 
-            dadosService.desativarConstraints(conexaoLocal);
+            Map<String, Object> dadosCache = cache.get(base);
 
-            Map<String, Object>  querysOrganizada = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
+            if (dadosCache == null || dadosCache.isEmpty())
+            {
+                // throw new SQLException("Necessário verificar se existe alterações.");
+                  dadosCache = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
+            }
             
-            
+             dadosService.desativarConstraints(conexaoLocal);
+
+            List<String> novoQuery = (List<String>) dadosCache.get("novoQuery");
+
+            Map<String, Object> resultadoInsercao = operacaoBancoService.executarInsercaoComDSL(conexaoCloud, novoQuery);
+            response.putAll(resultadoInsercao);
+        
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
-            response.put("success", true);
+            response.put("success", true); 
         }
         catch (Exception e)
         {

@@ -115,12 +115,14 @@
 			<version>3.2.0</version>
 		</dependency>
 		
-		<!--Cache-->
+		<!--SQLBuilder-->
 		<dependency>
 			<groupId>org.jooq</groupId>
 			<artifactId>jooq</artifactId>
 			<version>3.17.7</version>
 		</dependency>
+		<!--SQLBuilder-->
+
 		<!--Pool de conexão-->
 		<dependency>
 		    <groupId>com.zaxxer</groupId>

@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.UsuarioDTO;
-import br.syncdb.config.TabelaCacheManager;
+import br.syncdb.config.CacheManager;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
 import br.syncdb.service.DatabaseService;
@@ -151,11 +151,11 @@ public class SincronizacaoController
 		}
 	}
 
-	@GetMapping("/cache/stats")
-	public Map<String, Object> getCacheStats()
-	{
-		return TabelaCacheManager.getEstatisticasCache();
-	}
+	// @GetMapping("/cache/stats")
+	// public Map<String, Object> getCacheStats()
+	// {
+	// 	return TabelaCache.getEstatisticasCache();
+	// }
    
 
 }

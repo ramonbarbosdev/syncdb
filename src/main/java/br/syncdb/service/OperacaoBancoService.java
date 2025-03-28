@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -13,6 +14,7 @@ import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.Table;
 import org.jooq.conf.ParamType;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.jooq.Record;
 import org.jooq.Result;
@@ -90,16 +92,50 @@ public class OperacaoBancoService
         return queryList;
     }
 
-    public void executarConsulta(Connection connection, String sql)
+   /**
+ * Executa as inserções usando DSLContext do jOOQ
+ * 
+ * @param create DSLContext configurado
+ * @param queries Lista de queries SQL puro (serão convertidas para jOOQ)
+ * @return Mapa com resultados da operação
+ */
+    public Map<String, Object> executarInsercaoComDSL(Connection conexaoCloud, List<String> queries)
     {
-        DSLContext dsl = DSL.using(connection);
+        DSLContext create = DSL.using(conexaoCloud);
 
-        try {
-            int registrosAfetados = dsl.execute(sql);
-            System.out.println("Registros afetados: " + registrosAfetados);
-        } catch (Exception e) {
-            e.printStackTrace();
+        Map<String, Object> resultado = new HashMap<>();
+        int totalInseridos = 0;
+        List<String> erros = new ArrayList<>();
+
+        if (queries == null || queries.isEmpty())
+        {
+            resultado.put("success", true);
+            resultado.put("message", "Nenhuma query para executar");
+            return resultado;
         }
+
+        // Começa uma transação
+        create.transaction(configuration ->
+        {
+            DSLContext ctx = DSL.using(configuration);
+
+            for (String query : queries)
+            {
+                int affected = ctx.execute(query);
+                // totalInseridos += affected;
+            }
+        });
+
+        resultado.put("success", true);
+        resultado.put("totalInseridos", totalInseridos);
+        resultado.put("totalErros", erros.size());
+
+        if (!erros.isEmpty())
+        {
+            resultado.put("erros", erros);
+        }
+
+        return resultado;
     }
 
     public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela, Map<String, Object> response) throws SQLException
