@@ -44,13 +44,19 @@ public class DadosService
 
     @Autowired
     private EstruturaService estruturaService;
+
+    @Autowired
+    private OperacaoBancoService operacaoBancoService;
     
     
-    public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException {
-        if (nomeColuna == null || nomeColuna.isEmpty()) {
+    public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
+    {
+        if (nomeColuna == null || nomeColuna.isEmpty())
+        {
             nomeColuna = obterNomeColunaPK(conexao, tabela);
-            if (nomeColuna == null) {
-                throw new SQLException("Não foi possível identificar a coluna para obter o máximo ID");
+            if (nomeColuna == null)
+            {
+                return (Long) null;
             }
         }
     
@@ -90,146 +96,7 @@ public class DadosService
 
     }
 
-    public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela, Map<String, Object> response) throws SQLException
-    {
-        final int BATCH_SIZE = 1000;
-        final int PAGE_SIZE = 50000;
-        long offset = 0;
-        
-        try (java.sql.Statement cloudStmt = conexaoCloud.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY))
-        {
-            cloudStmt.setFetchSize(BATCH_SIZE);
-
-            while (true)
-            {
-                String query = String.format("SELECT * FROM %s ORDER BY 1 LIMIT %d OFFSET %d", 
-                                              tabela, PAGE_SIZE, offset);
-
-                try (ResultSet rs = cloudStmt.executeQuery(query))
-                {
-                    if (rs.isBeforeFirst())
-                    {
-                
-                        PreparedStatement localInsert = criarPreparedInsert(conexaoLocal, tabela, rs.getMetaData());
-
-                        int batchCount = 0;
-                        conexaoLocal.setAutoCommit(false);
-
-                        while (rs.next())
-                        {
-                            preencherPreparedStatement(localInsert, rs);
-                            localInsert.addBatch();
-
-                            if (++batchCount % BATCH_SIZE == 0)
-                            {
-                                localInsert.executeBatch();
-                                conexaoLocal.commit();
-                            }
-                        }
-
-                        if (batchCount > 0)
-                        {
-                            localInsert.executeBatch();
-                            conexaoLocal.commit();
-                        }
-
-                        localInsert.close();
-
-                        if (batchCount < PAGE_SIZE) break;
-
-                        offset += PAGE_SIZE;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-            }
-
-            // response.put("message", "Sincronização da tabela "+tabela+" concluida.");
-
-        }
-        catch (SQLException e)
-        {
-            conexaoLocal.rollback();
-            throw e;
-        }
-    }
     
-    public void sincronizacaoIncremental(Connection conexaoCloud, Connection conexaoLocal, 
-        String tabela,
-        String pkColumn,
-        long maxLocalId,
-        Map<String, Object> response
-    ) throws SQLException
-    {
-        final int BATCH_SIZE = 1000;
-        
-        // String query = String.format("SELECT * FROM %s WHERE %s > ? ORDER BY %s", 
-        //                         tabela, pkColumn, pkColumn);
-        String query = String.format("SELECT * FROM %s WHERE %s = ? ORDER BY %s", 
-                                tabela, pkColumn, pkColumn);
-        
-        try (PreparedStatement cloudStmt = conexaoCloud.prepareStatement(query,  ResultSet.TYPE_FORWARD_ONLY,  ResultSet.CONCUR_READ_ONLY))
-        {
-            cloudStmt.setFetchSize(1000);
-            cloudStmt.setLong(1, maxLocalId);
-            
-            try (ResultSet rs = cloudStmt.executeQuery();  PreparedStatement localInsert = criarPreparedInsert(conexaoLocal, tabela, rs.getMetaData()))
-            {
-                
-                conexaoLocal.setAutoCommit(false);
-                int batchCount = 0;
-                
-                while (rs.next())
-                {
-                    preencherPreparedStatement(localInsert, rs);
-                    localInsert.addBatch();
-                    
-                    if (++batchCount % BATCH_SIZE == 0)
-                    {
-                        localInsert.executeBatch();
-                        conexaoLocal.commit();
-                    }
-                }
-                
-                localInsert.executeBatch();
-                conexaoLocal.commit();
-                // response.put("message", "Sincronização incremental concluida.");
-
-            }
-        }
-    }
-
-    public PreparedStatement criarPreparedInsert(Connection conexao, String tabela, ResultSetMetaData meta) throws SQLException
-    {
-        StringBuilder sql = new StringBuilder("INSERT INTO ").append(tabela).append(" (");
-        StringBuilder values = new StringBuilder("VALUES (");
-        
-        int columnCount = meta.getColumnCount();
-        for (int i = 1; i <= columnCount; i++)
-        {
-            if (i > 1)
-            {
-                sql.append(", ");
-                values.append(", ");
-            }
-            sql.append(meta.getColumnName(i));
-            values.append("?");
-        }
-        
-        sql.append(") ").append(values).append(")");
-        
-        return conexao.prepareStatement(sql.toString());
-    }
-
-    public void preencherPreparedStatement(PreparedStatement stmt, ResultSet rs) throws SQLException
-    {
-        for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++)
-        {
-            stmt.setObject(i, rs.getObject(i));
-        }
-    }
 
     public Map<String, Set<String>> obterDependenciasTabelas(Connection conexao) throws SQLException
     {
@@ -277,17 +144,48 @@ public class DadosService
         return ordenadas;
     }
 
+    public Map<String, Object> carregarOrdemTabela(Connection conexaoCloud, Connection conexaoLocal, 
+    String tabela) throws SQLException
+    {
+        
+        Map<String, Object> response = new LinkedHashMap<>(); 
+        Map<String, Object> parametrosMap = new HashMap<String, Object>();
+
+        estruturaService.validarEstruturaTabela(conexaoCloud, conexaoLocal, tabela);
+
+        Map<String, Set<String>> dependencias = obterDependenciasTabelas(conexaoCloud);
+
+        List<String> ordemCarga = ordenarTabelasPorDependencia(dependencias);
+
+        if (tabela != null)
+        {
+            ordemCarga = filtrarTabelasRelevantes(tabela, ordemCarga, dependencias);
+        }
+
+        parametrosMap.put("response", response);
+        parametrosMap.put("ordemCarga", ordemCarga);
+
+        return parametrosMap;
+    }
+
+    public Map<String, Object> processarSincronizacao(Connection conexaoCloud, Connection conexaoLocal, 
+    String tabela) throws SQLException
+    {
+        Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
+
+        processarCargaTabelas(conexaoCloud, conexaoLocal,(List<String>) parametrosMap.get("ordemCarga") , (Map<String, Object>) parametrosMap.get("response"));
+
+        return (Map<String, Object>) parametrosMap.get("response");
+    }
+
+ 
 
    
     public void desativarConstraints(Connection conn) throws SQLException
     {
         try (java.sql.Statement stmt = conn.createStatement())
-        {
-            // Método mais eficiente (desativa todas as constraints de uma vez)
+        {    
             stmt.execute("SET session_replication_role = replica");
-            
-            // Alternativa para versões mais antigas:
-            // stmt.execute("SET CONSTRAINTS ALL DEFERRED");
         }
     }
     
@@ -295,7 +193,6 @@ public class DadosService
     {
         try (java.sql.Statement stmt = conn.createStatement())
         {
-            // Reativa todas as constraints
             stmt.execute("SET session_replication_role = origin");
         }
     }
@@ -407,59 +304,142 @@ public class DadosService
 
         }
 
-        private void buscarDependencias(String tabela, Map<String, Set<String>> dependencias, 
-        Set<String> tabelasRelevantes, Set<String> visitado, Set<String> ciclo)
+    private void buscarDependencias(String tabela, Map<String, Set<String>> dependencias, 
+    Set<String> tabelasRelevantes, Set<String> visitado, Set<String> ciclo)
+    {
+
+        if (ciclo.contains(tabela))
         {
+            System.out.println("Ciclo detectado em: " + tabela);
 
-            if (ciclo.contains(tabela))
-            {
-                System.out.println("Ciclo detectado em: " + tabela);
-
-                dependencias.getOrDefault(tabela, new HashSet<>()).clear();
-                // return;
-            }
-            if (visitado.contains(tabela))
-            {
-                return;
-            }
-
-            visitado.add(tabela);
-            tabelasRelevantes.add(tabela);
-
-            if (dependencias.containsKey(tabela))
-            {
-                for (String dependente : dependencias.get(tabela))
-                {
-                    buscarDependencias(dependente, dependencias, tabelasRelevantes, visitado, ciclo);
-                }
-            }
+            dependencias.getOrDefault(tabela, new HashSet<>()).clear();
+            // return;
+        }
+        if (visitado.contains(tabela))
+        {
+            return;
         }
 
-    
+        visitado.add(tabela);
+        tabelasRelevantes.add(tabela);
+
+        if (dependencias.containsKey(tabela))
+        {
+            for (String dependente : dependencias.get(tabela))
+            {
+                buscarDependencias(dependente, dependencias, tabelasRelevantes, visitado, ciclo);
+            }
+        }
+    }
+
+    public   Map<String, Object> definirParametrosVerificacao(Connection conexaoCloud, Connection conexaoLocal, String  tabela) throws SQLException
+    {
+
+        String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
+
+        Map<String, Object> parametros = new HashMap<String, Object>();
+
+        if(tabela == null)
+        {
+            throw new SQLException("Tabela não especificada.");
+        }
+
+        if(pkColumn == null)
+        {
+           return null;
+        }
+
+        long maxCloudId = obterMaxId(conexaoCloud, tabela, pkColumn);
+        long maxLocalId = obterMaxId(conexaoLocal, tabela, pkColumn);
+        int countCloud = obterQuantidadeRegistro(conexaoCloud, tabela);
+        int countLocal= obterQuantidadeRegistro(conexaoLocal, tabela);
+
+        if((Long) maxCloudId == null)
+        {
+            return null;
+        }
+
+        if(maxLocalId == 0)
+        {
+            parametros.put("novo", true);
+        }
+        else
+        {
+            parametros.put("novo", false );
+        }
+
+        if(maxCloudId > maxLocalId || countCloud != countLocal)
+        {
+            parametros.put("existente", true);
+        }
+        else
+        {
+            parametros.put("existente", false);
+        }
+
+        return parametros;
+    }
+
+    public  Map<String,  List<String>>  obterTabelasOrganizada(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+    {
+        Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
+        List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
+        Map<String,  List<String>> tabelaOrganizada = new LinkedHashMap<>(); 
+        tabelaOrganizada.put("novo", new ArrayList<>());
+        tabelaOrganizada.put("incremento", new ArrayList<>());
+        tabelaOrganizada.put("sincronizado", new ArrayList<>());
+
+        for(String tabelaCarga : tabelas)
+        {
+           
+            Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, tabelaCarga);
+
+            if(parametros != null)
+            {
+                if ((Boolean) parametros.get("novo"))
+                {
+                    tabelaOrganizada.get("novo").add(tabelaCarga);
+                    System.out.println("Sincronização da tabela "+tabelaCarga+" concluida.");
+                } 
+                else if ((Boolean) parametros.get("existente"))
+                {
+                    tabelaOrganizada.get("incremento").add(tabelaCarga);
+                    System.out.println("Sincronização da tabela "+tabelaCarga+" concluida.");
+                } 
+                else
+                {
+                    tabelaOrganizada.get("sincronizado").add(tabelaCarga);
+                    System.out.println("Dados da tabela "+tabelaCarga+" já sincronizados" );
+                }
+            }
+            
+
+        }
+
+        return tabelaOrganizada;
+            
+    }
+
+
     public void processarCargaTabelas(Connection conexaoCloud, Connection conexaoLocal, List<String> tabelas, Map<String, Object> response) throws SQLException
     {
         tabelas.forEach(tabela ->
         {
             try
             {
-                String pkColumn = obterNomeColunaPK(conexaoCloud, tabela);
-                long maxCloudId = obterMaxId(conexaoCloud, tabela, pkColumn);
-                long maxLocalId = obterMaxId(conexaoLocal, tabela, pkColumn);
-                int countCloud = obterQuantidadeRegistro(conexaoCloud, tabela);
-                int countLocal= obterQuantidadeRegistro(conexaoLocal, tabela);
-
+                Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, tabela);
                 
-                if (maxLocalId == 0)
+                if ((Boolean) parametros.get("novo"))
                 {
-                    cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
-                    atualizarSequencias( conexaoLocal, tabela, pkColumn);
+                    operacaoBancoService.cargaInicialCompleta(conexaoCloud, conexaoLocal, tabela, response);
+                    atualizarSequencias( conexaoLocal, tabela);
 
                     response.put(tabela + "_status", "CARGA_INICIAL_COMPLETA");
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
                 } 
-                else if (maxCloudId > maxLocalId || countCloud != countLocal)
+                else if ((Boolean) parametros.get("existente"))
                 {
-                    verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, tabela, pkColumn, response);
+                    verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, tabela, response);
                    
                     response.put(tabela + "_status", "SINCRONIZACAO_INCREMENTAL");
                     System.out.println("Sincronização da tabela "+tabela+" concluida.");
@@ -470,7 +450,6 @@ public class DadosService
                     System.out.println("Dados da tabela "+tabela+" já sincronizados" );
                 }
 
-                // validarTabelaIndividual(conexaoLocal, tabela, response);
             }
             catch (SQLException e)
             {
@@ -565,9 +544,9 @@ public class DadosService
     }
     
 
-    public Long verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn, Map<String, Object> response) throws SQLException 
+    public void verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, Map<String, Object> response) throws SQLException 
     {
-        Long registroNovo = null;
+        String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
 
         DSLContext createLocal = DSL.using(conexaoLocal, SQLDialect.POSTGRES);
         DSLContext createCloud = DSL.using(conexaoCloud, SQLDialect.POSTGRES);
@@ -586,8 +565,8 @@ public class DadosService
                                             .fetch();
 
         if(sqlLocal == null || sqlCloud == null)
-         {
-            return null;
+        {
+            return ;
         }
         
         for (Record1<Object> local : sqlLocal)
@@ -606,6 +585,8 @@ public class DadosService
         if (!registrosDesconhecidos.isEmpty())
         {
             System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
+            // registroNovo = registrosDesconhecidos.iterator().next() ;
+
         }
 
         Set<Long> registrosExtras = new HashSet<>(registrosCloud);
@@ -614,12 +595,12 @@ public class DadosService
         if (!registrosExtras.isEmpty())
         {
             System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
-            registroNovo = registrosExtras.iterator().next() ;
-            sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, registroNovo, response);
+            // registroNovo = registrosExtras.iterator().next() ;
+            // operacaoBancoService.sincronizacaoIncremental(conexaoCloud, conexaoLocal, tabela, pkColumn, registroNovo, response);
 
         }
         
-        return registroNovo;
+     
      
     }
 
@@ -663,8 +644,9 @@ public class DadosService
         }
     }
     
-    public void atualizarSequencias(Connection connection, String nomeTabela, String pkColumn)
+    public void atualizarSequencias(Connection connection, String nomeTabela) throws SQLException
     {
+        String pkColumn = obterNomeColunaPK(connection, nomeTabela);
         String seq = consultarSequenciasPorTabela(connection, nomeTabela);
 
         if(seq == null) 

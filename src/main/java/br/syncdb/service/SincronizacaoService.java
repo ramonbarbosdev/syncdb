@@ -48,12 +48,53 @@ public class SincronizacaoService
     private DadosService dadosService;
 
 
-    public Map<String, Object> sincronizarDados(String base, String tabela)
+    public Map<String, Object> verificarAlteracaoRegistro(String base, String tabela)
     {
-        Map<String, Object> response = new LinkedHashMap<>(); 
+        Map<String, Object> response = new HashMap<String, Object>();
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
-     
+        
+
+        try
+        {
+            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoLocal.setAutoCommit(false);
+
+            Map<String,  List<String>>  tabelaOrganizada = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
+
+            if(tabelaOrganizada.get("incremento") != null)
+            {
+                for( String itemTabela : tabelaOrganizada.get("incremento"))
+                {
+                    dadosService.verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, response);
+                  
+
+                }
+
+            }
+
+            response.put("success", true);
+        }
+        catch (Exception e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
+        }
+        finally
+        {
+            finalizarConexoes(conexaoCloud, conexaoLocal);
+        }
+
+        return response;
+    }
+
+    public Map<String, Object> sincronizarDados(String base, String tabela)
+    {
+       
+        Connection conexaoCloud = null;
+        Connection conexaoLocal = null;
+        Map<String, Object> response = null;
+
         try
         {
             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
@@ -63,7 +104,7 @@ public class SincronizacaoService
 
             dadosService.desativarConstraints(conexaoLocal);
 
-            processarSincronizacao(conexaoCloud, conexaoLocal, tabela, response);
+            response = dadosService.processarSincronizacao(conexaoCloud, conexaoLocal, tabela);
             
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
@@ -82,25 +123,6 @@ public class SincronizacaoService
         return response;
     }
     
-    private void processarSincronizacao(Connection conexaoCloud, Connection conexaoLocal, 
-                                       String tabela, Map<String, Object> response) throws SQLException
-    {
-        estruturaService.validarEstruturaTabela(conexaoCloud, conexaoLocal, tabela);
-        
-        
-        Map<String, Set<String>> dependencias = dadosService.obterDependenciasTabelas(conexaoCloud);
-
-        List<String> ordemCarga = dadosService.ordenarTabelasPorDependencia(dependencias);
-
-        if (tabela != null)
-        {
-            ordemCarga = dadosService.filtrarTabelasRelevantes(tabela, ordemCarga, dependencias);
-        }
-     
-        dadosService.processarCargaTabelas(conexaoCloud, conexaoLocal, ordemCarga, response);
-        
-        // dadosService.validarIntegridadeDados(conexaoLocal, response);
-    }
     
 
     public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela )

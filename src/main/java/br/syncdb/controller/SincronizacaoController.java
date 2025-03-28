@@ -1,6 +1,7 @@
 package br.syncdb.controller;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -116,6 +117,15 @@ public class SincronizacaoController
 		}
 
 
+	}
+    @GetMapping(value = "/verificardados/{base}/{tabela}", produces = "application/json")
+	public ResponseEntity<?> verificarAlteracaoRegistros(@PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela )
+	{
+		
+		Map<String, Object> resultado = sincronizacaoService.verificarAlteracaoRegistro(base,  tabela);
+
+		
+		return new ResponseEntity<>(resultado, HttpStatus.OK);
 	}
 
 	@GetMapping("/cache/stats")
