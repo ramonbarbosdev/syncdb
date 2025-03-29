@@ -1,5 +1,6 @@
 package br.syncdb.service;
 
+import java.beans.Statement;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -147,95 +148,138 @@ public class OperacaoBancoService
 
         return resultado;
     }
-    public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+    
+    public void execultarQuerySQL(Connection conexao ,  Map<String,List<String>> querys) throws SQLException
     {
+        if(querys.size() == 0) return;
+        
+        for (Map.Entry<String, List<String>> entry : querys.entrySet())
+        {
+            String tabelaPendente = entry.getKey();
+            List<String> scripts = entry.getValue();
 
-        Map<String, Object> insertCache = new LinkedHashMap<>();
+            for (String script : scripts) {
+                try (java.sql.Statement stmt = conexao.createStatement())
+                {
+                    stmt.executeUpdate(script);
+                }
+            }
+        }
+    }
+
+    public List<String> cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException {
+        // Map para armazenar as instruções SQL (cache)
+        List<String> sqlCache = new ArrayList<>();
 
         final int BATCH_SIZE = 1000;
         final int PAGE_SIZE = 50000;
         long offset = 0;
-        
-        try (java.sql.Statement cloudStmt = conexaoCloud.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY))
-        {
+
+        try (java.sql.Statement cloudStmt = conexaoCloud.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
             cloudStmt.setFetchSize(BATCH_SIZE);
 
-            while (true)
-            {
-                String query = String.format("SELECT * FROM %s ORDER BY 1 LIMIT %d OFFSET %d", 
-                                              tabela, PAGE_SIZE, offset);
+            while (true) {
+                String query = String.format("SELECT * FROM %s ORDER BY 1 LIMIT %d OFFSET %d", tabela, PAGE_SIZE, offset);
 
-                try (ResultSet rs = cloudStmt.executeQuery(query))
-                {
-                    if (rs.isBeforeFirst())
-                    {
-                
-                        PreparedStatement localInsert = criarPreparedInsert(conexaoLocal, tabela, rs.getMetaData());
-
-                        int batchCount = 0;
-                        conexaoLocal.setAutoCommit(false);
-
-                        while (rs.next())
-                        {
-                            preencherPreparedStatement(localInsert, rs);
-                            localInsert.addBatch();
-
-                            if (++batchCount % BATCH_SIZE == 0)
-                            {
-                                localInsert.executeBatch();
-                                // conexaoLocal.commit();
-                            }
+                try (ResultSet rs = cloudStmt.executeQuery(query)) {
+                    if (rs.isBeforeFirst()) {
+                        // Coletar os registros e construir as instruções SQL
+                        while (rs.next()) {
+                            // Supondo que a primeira coluna seja a chave (id)
+                            String id = rs.getString(1);
+                            // Construir a instrução SQL
+                            String sql = construirInsertSQL(tabela, rs);
+                            // Armazenar a instrução SQL no Map
+                            sqlCache.add(sql);
                         }
 
-                        if (batchCount > 0)
-                        {
-                            localInsert.executeBatch();
-                            // conexaoLocal.commit();
+                        // Verificar se terminou a paginação
+                        if (sqlCache.size() < PAGE_SIZE) {
+                            break;
                         }
-
-                        localInsert.close();
-
-                        if (batchCount < PAGE_SIZE) break;
 
                         offset += PAGE_SIZE;
-                    }
-                    else
-                    {
+                    } else {
                         break;
                     }
                 }
             }
-
-            // response.put("message", "Sincronização da tabela "+tabela+" concluida.");
-
-        }
-        catch(BatchUpdateException e)
-        {
+        } catch (BatchUpdateException e) {
             conexaoLocal.rollback();
-            // System.err.println("Erro durante a execução do lote: " + e.getMessage());
-            
-            SQLException nextException = e.getNextException();
-            while (nextException != null)
-            {
-                if (nextException.getMessage().contains("duplicate key value violates unique constraint"))
-                {
-                    System.err.println("Erro: Chave duplicada detectada. Registro já existe na tabela "+tabela+".");
-                    throw new RuntimeException("Erro: Chave duplicada detectada. Registro já existe na tabela "+tabela+".");
-                }
-                else
-                {
-                    System.err.println("Outro erro SQL: " + nextException.getMessage());
-                }
-                nextException = nextException.getNextException();
-            }
-            throw new RuntimeException("Falha ao executar batch", e);
-        }
-        catch (SQLException e)
-        {
+            handleBatchUpdateException(e, tabela);
+        } catch (SQLException e) {
             conexaoLocal.rollback();
             throw e;
         }
+
+        // Retornar o Map com todas as instruções SQL
+        return sqlCache;
     }
+
+    // Método para construir a instrução SQL de INSERT
+    private String construirInsertSQL(String tabela, ResultSet rs) throws SQLException {
+        StringBuilder sql = new StringBuilder("INSERT INTO ");
+        sql.append(tabela).append(" (");
+    
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+    
+        // Adicionar os nomes das colunas
+        for (int i = 1; i <= columnCount; i++) {
+            sql.append(metaData.getColumnName(i));
+            if (i < columnCount) {
+                sql.append(", ");
+            }
+        }
+    
+        sql.append(") VALUES (");
+    
+        // Adicionar os valores das colunas
+        for (int i = 1; i <= columnCount; i++) {
+            Object value = rs.getObject(i);
+            if (value == null) {
+                sql.append("NULL"); // Tratar valores nulos
+            } else if (value instanceof String) {
+                // Escapar apóstrofos em strings
+                sql.append("'").append(escapeApostrophe(value.toString())).append("'");
+            } else if (value instanceof java.util.Date) {
+                // Formatar datas para o padrão SQL
+                sql.append("'").append(new java.sql.Timestamp(((java.util.Date) value).getTime())).append("'");
+            } else {
+                sql.append(value);
+            }
+            if (i < columnCount) {
+                sql.append(", ");
+            }
+        }
+    
+        sql.append(");");
+    
+        return sql.toString();
+    }
+
+    private String escapeApostrophe(String value) {
+        return value.replace("'", "''");
+    }
+
+    // Método para tratar exceções de lote
+    private void handleBatchUpdateException(BatchUpdateException e, String tabela) {
+        System.err.println("Erro durante a execução do lote: " + e.getMessage());
+
+        SQLException nextException = e.getNextException();
+        while (nextException != null) {
+            if (nextException.getMessage().contains("duplicate key value violates unique constraint")) {
+                System.err.println("Erro: Chave duplicada detectada. Registro já existe na tabela " + tabela + ".");
+                throw new RuntimeException("Erro: Chave duplicada detectada. Registro já existe na tabela " + tabela + ".");
+            } else {
+                System.err.println("Outro erro SQL: " + nextException.getMessage());
+            }
+            nextException = nextException.getNextException();
+        }
+        throw new RuntimeException("Falha ao executar batch", e);
+    }
+
+
     
     public void sincronizacaoIncremental(Connection conexaoCloud, Connection conexaoLocal, 
         String tabela,

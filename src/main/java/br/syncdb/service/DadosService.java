@@ -370,10 +370,11 @@ public class DadosService
         return parametros;
     }
 
-    public  Map<String, Object>  obterTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+    public   Map<String,List<String>> obterTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
     {
-        Map<String, Object> retorno = new HashMap<String, Object>();
-        
+
+        Map<String,List<String>> sqlCache =  new LinkedHashMap<>();
+
         Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
         List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
         
@@ -387,13 +388,20 @@ public class DadosService
                 {
                     atualizarSequencias(conexaoLocal, tabela);
 
-                    operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
+                    List<String> script = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
 
+                    sqlCache.put(itemTabela,script);
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
+                    String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
+
+                    List<String> script = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);
+                    sqlCache.put(itemTabela,script);
+
                     System.out.println("Tabela '"+itemTabela+"' com atualizações de dados pendendes.");
+                    // verificarConsistenciaDados( conexaoLocal,  conexaoCloud,  tabela,  pkColumn) ;
                 } 
                 else
                 {
@@ -402,152 +410,23 @@ public class DadosService
                 
             }
             
-
         }
 
-
-        return retorno;
+        return sqlCache;
             
     }
-    public  Map<String, Object>  obterTabelasPendentesAlteracao(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+  
+
+    public  List<String> verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException 
     {
-        Map<String, Object> retorno = new HashMap<String, Object>();
-        
-        Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
-        List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
-        
-        Map<String,  List<String>> incrementoQuery = new LinkedHashMap<>(); 
-        List<String> novoQuery = new ArrayList<String>();
-
-        for(String itemTabela : tabelas)
-        {        
-            Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
-
-            if(parametros != null)
-            {
-                if ((Boolean) parametros.get("novo"))
-                {
-                    // atualizarSequencias(conexaoLocal, tabela);
-                    // List<String> novosRegistros =  operacaoBancoService.registroNovo( conexaoCloud, itemTabela);
-                    // novoQuery.addAll(novosRegistros);
-                    System.out.println("Nescessario a criacao da tabela '"+itemTabela+"'.");
-                } 
-                else if ((Boolean) parametros.get("existente"))
-                {
-                    Map<String, List<String>> resultadoIncremento = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela);
-        
-                    incrementoQuery.put(itemTabela, resultadoIncremento.get("insert")); 
-                    incrementoQuery.put(itemTabela, resultadoIncremento.get("delete")); 
-                    System.out.println("Tabela '"+itemTabela+"' com atualizações pendendes.");
-                } 
-                else
-                {
-                    System.out.println("Tabela '"+itemTabela+"' não possui atualizações pendentes.");
-                }
-                
-            }
-            
-
-        }
-
-        retorno.put("incrementoQuery", incrementoQuery);
-        retorno.put("novoQuery", novoQuery);
-
-        return retorno;
-            
-    }
-
-
- 
-
-
-    public void validarTabelaIndividual(Connection conn, String tabela, Map<String, Object> response) {
-        try {
-            // Verifica apenas as FKs da tabela atual
-            Map<String, Object> validacao = validarTabela(conn, tabela);
-            response.put(tabela + "_validacao", validacao);
-            
-            if (!(Boolean) validacao.getOrDefault("integridade_ok", true)) {
-                throw new SQLException("Problemas de integridade na tabela " + tabela);
-            }
-        } catch (SQLException e) {
-            System.out.println("Erro na validação da tabela "+tabela );
-
-            throw new RuntimeException(e);
-        }
-    }
-
-
-
-    public Map<String, Object> validarTabela(Connection conn, String tabela) throws SQLException {
-        Map<String, Object> resultado = new HashMap<>();
-        List<Map<String, String>> problemas = new ArrayList<>();
-        boolean integridadeOk = true;
-        
-        DatabaseMetaData meta = conn.getMetaData();
-        String catalog = conn.getCatalog();
-        
-        try (ResultSet rs = meta.getImportedKeys(catalog, null, tabela)) {
-            while (rs.next()) {
-                String fkName = rs.getString("FK_NAME");
-                String fkColumn = rs.getString("FKCOLUMN_NAME");
-                String pkTable = rs.getString("PKTABLE_NAME");
-                String pkColumn = rs.getString("PKCOLUMN_NAME");
-                
-                try {
-                    // Usa JOIN para melhorar performance
-                    String query = String.format(
-                        "SELECT COUNT(*) FROM %s t LEFT JOIN %s r ON t.%s = r.%s " +
-                        "WHERE t.%s IS NOT NULL AND r.%s IS NULL", 
-                        tabela, pkTable, fkColumn, pkColumn, fkColumn, pkColumn);
-                    
-                    try (java.sql.Statement stmt = conn.createStatement();
-                         ResultSet countRs = stmt.executeQuery(query)) {
-                        if (countRs.next() && countRs.getInt(1) > 0) {
-                            Map<String, String> problema = new HashMap<>();
-                            problema.put("constraint", fkName);
-                            problema.put("coluna", fkColumn);
-                            problema.put("tabela_referencia", pkTable);
-                            problema.put("registros_inconsistentes", String.valueOf(countRs.getInt(1)));
-                            problemas.add(problema);
-                            integridadeOk = false;
-    
-                            // Mostra os registros inconsistentes para debug
-                            String queryDetalhada = String.format(
-                                "SELECT t.%s FROM %s t LEFT JOIN %s r ON t.%s = r.%s " +
-                                "WHERE t.%s IS NOT NULL AND r.%s IS NULL LIMIT 5", 
-                                fkColumn, tabela, pkTable, fkColumn, pkColumn, fkColumn, pkColumn);
-    
-                            try (ResultSet rsDetalhado = stmt.executeQuery(queryDetalhada)) {
-                                while (rsDetalhado.next()) {
-                                    System.out.println("Inconsistência encontrada: " + rsDetalhado.getString(1));
-                                }
-                            }
-                        }
-                    }
-                } catch (SQLException e) {
-                    Map<String, String> erro = new HashMap<>();
-                    erro.put("erro", String.format("Falha ao validar FK '%s' (coluna '%s' -> tabela '%s'): %s", fkName, fkColumn, pkTable, e.getMessage()));
-                    problemas.add(erro);
-                    integridadeOk = false;
-                }
-            }
-        }
-        
-        resultado.put("integridade_ok", integridadeOk);
-        resultado.put("problemas", problemas);
-        return resultado;
-    }
-    
-
-    public  Map<String,  List<String>> verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela) throws SQLException 
-    {
-        String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
         Long id;
 
         Map<String,  List<String>> resutadoQuery = new LinkedHashMap<>(); 
         resutadoQuery.put("delete", new ArrayList<>());
         resutadoQuery.put("insert", new ArrayList<>());
+
+        List<String> sqlCache = new ArrayList<>();
+
 
         DSLContext createLocal = DSL.using(conexaoLocal, SQLDialect.POSTGRES);
         DSLContext createCloud = DSL.using(conexaoCloud, SQLDialect.POSTGRES);
@@ -588,6 +467,8 @@ public class DadosService
             // System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
             id = registrosDesconhecidos.iterator().next() ;
             resutadoQuery.put("delete", operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
+            sqlCache.addAll( operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
+
         }
         
         Set<Long> registrosExtras = new HashSet<>(registrosCloud);
@@ -597,10 +478,11 @@ public class DadosService
         {
             // System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
             id = registrosExtras.iterator().next() ;
-            resutadoQuery.put("insert", operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
+            sqlCache.addAll(operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
+
         }
         
-        return resutadoQuery;
+        return sqlCache;
      
     }
 
@@ -610,10 +492,11 @@ public class DadosService
         String sqlCloud = String.format("SELECT * FROM %s WHERE %s = ?", tabela, pkColumn);
     
         try (PreparedStatement stmtLocal = conexaoLocal.prepareStatement(sqlLocal);
-             PreparedStatement stmtCloud = conexaoCloud.prepareStatement(sqlCloud)) {
+             PreparedStatement stmtCloud = conexaoCloud.prepareStatement(sqlCloud))
+        {
     
             // Supondo que o PK seja único, então pegamos o ID
-            stmtLocal.setLong(1, 123);  // Exemplo: ID de registro
+            stmtLocal.setLong(1, 123); 
             stmtCloud.setLong(1, 123);
     
             try (ResultSet rsLocal = stmtLocal.executeQuery();

@@ -86,7 +86,7 @@ public class SincronizacaoController
 	public ResponseEntity<?> sincronizacaoDadosIndividual ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
 	{
 	
-		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  tabela);
+		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  tabela, false);
 
 		if ((Boolean) resultado.get("success"))
 		{
@@ -104,7 +104,7 @@ public class SincronizacaoController
 	public ResponseEntity<?> sincronizacaoDadosTotal ( @PathVariable (value = "base") String base ) 
 	{
 	
-		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  null);
+		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  null, false);
 
 		if ((Boolean) resultado.get("success"))
 		{
@@ -118,38 +118,7 @@ public class SincronizacaoController
 
 
 	}
-    @GetMapping(value = "/verificardados/{base}/{tabela}", produces = "application/json")
-	public ResponseEntity<?> verificarAlteracaoRegistros(@PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela )
-	{
-		
-		Map<String, Object> resultado = sincronizacaoService.verificarAlteracaoRegistro(base,  tabela);
-
-		if ((Boolean) resultado.get("success"))
-		{
-			return ResponseEntity.ok(resultado);
-		}
-		else
-		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
-		}
-	}
-    @GetMapping(value = "/verificardados/{base}", produces = "application/json")
-	public ResponseEntity<?> verificarAlteracaoRegistrosTotal(@PathVariable (value = "base") String base )
-	{
-		
-		Map<String, Object> resultado = sincronizacaoService.verificarAlteracaoRegistro(base,  null);
-
-		if ((Boolean) resultado.get("success"))
-		{
-			return ResponseEntity.ok(resultado);
-		}
-		else
-		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
-		}
-	}
+  
 
 	// @GetMapping("/cache/stats")
 	// public Map<String, Object> getCacheStats()

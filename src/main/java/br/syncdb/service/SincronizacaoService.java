@@ -54,44 +54,15 @@ public class SincronizacaoService
 
     private static final Map<String, Map<String, Object>> cache = new ConcurrentHashMap<>();
 
-    public Map<String, Object> verificarAlteracaoRegistro(String base, String tabela)
-    {
-        Map<String, Object> response = new HashMap<String, Object>();
-        Connection conexaoCloud = null;
-        Connection conexaoLocal = null;
-        
-        try
-        {
-            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-            conexaoLocal.setAutoCommit(false);
+   
 
-            Map<String, Object>  querysOrganizada = dadosService.obterTabelasPendentesAlteracao(conexaoCloud,conexaoLocal, tabela );
-
-            response.put("objeto", querysOrganizada);
-            
-            response.put("success", true); 
-            response.put("message", "Sincronização de dados concluida"); 
-        }
-        catch (Exception e)
-        {
-            tratarErroSincronizacao(response, conexaoLocal, e);
-        }
-        finally
-        {
-            finalizarConexoes(conexaoCloud, conexaoLocal);
-        }
-
-        return response;
-    }
-
-    public Map<String, Object> sincronizarDados(String base, String tabela)
+    public Map<String, Object> sincronizarDados(String base, String tabela, Boolean fl_verificacao)
     {
        
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
         Map<String, Object> response = new HashMap<String, Object>();
-        
+       
         try
         {
             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
@@ -100,7 +71,14 @@ public class SincronizacaoService
 
             dadosService.desativarConstraints(conexaoLocal);
 
-            Map<String, Object>  querysOrganizada = dadosService.obterTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela );
+            Map<String,List<String>>  querys = dadosService.obterTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela );
+
+            //incluir no cache'
+
+            if(fl_verificacao == false)
+            {
+                operacaoBancoService.execultarQuerySQL(conexaoLocal,querys);
+            }
 
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
