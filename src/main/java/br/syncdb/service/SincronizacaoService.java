@@ -66,15 +66,12 @@ public class SincronizacaoService
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
             conexaoLocal.setAutoCommit(false);
 
-            Map<String, Object>  querysOrganizada = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
-
-            cache.put(base, querysOrganizada);
+            Map<String, Object>  querysOrganizada = dadosService.obterTabelasPendentesAlteracao(conexaoCloud,conexaoLocal, tabela );
 
             response.put("objeto", querysOrganizada);
-
-      
-
-            response.put("success", true);
+            
+            response.put("success", true); 
+            response.put("message", "Sincronização de dados concluida"); 
         }
         catch (Exception e)
         {
@@ -94,7 +91,6 @@ public class SincronizacaoService
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
         Map<String, Object> response = new HashMap<String, Object>();
-
         
         try
         {
@@ -102,24 +98,15 @@ public class SincronizacaoService
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
             conexaoLocal.setAutoCommit(false);
 
-            Map<String, Object> dadosCache = cache.get(base);
+            dadosService.desativarConstraints(conexaoLocal);
 
-            if (dadosCache == null || dadosCache.isEmpty())
-            {
-                // throw new SQLException("Necessário verificar se existe alterações.");
-                  dadosCache = dadosService.obterTabelasOrganizada(conexaoCloud,conexaoLocal, tabela );
-            }
-            
-             dadosService.desativarConstraints(conexaoLocal);
+            Map<String, Object>  querysOrganizada = dadosService.obterTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela );
 
-            List<String> novoQuery = (List<String>) dadosCache.get("novoQuery");
-
-            Map<String, Object> resultadoInsercao = operacaoBancoService.executarInsercaoComDSL(conexaoCloud, novoQuery);
-            response.putAll(resultadoInsercao);
-        
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
             response.put("success", true); 
+            response.put("message", "Sincronização de dados concluida"); 
+
         }
         catch (Exception e)
         {

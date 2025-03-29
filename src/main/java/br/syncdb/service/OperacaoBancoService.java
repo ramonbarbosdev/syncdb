@@ -1,5 +1,6 @@
 package br.syncdb.service;
 
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -7,8 +8,10 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -73,22 +76,29 @@ public class OperacaoBancoService
 
     public List<String> registroNovo(Connection conexaoCloud, String tabela)
     {
-        DSLContext dsl = DSL.using(conexaoCloud);
-        Table<Record> tabelaRecord = DSL.table(tabela);
-
-        Result<Record> resultados = dsl.select()
-                                    .from(tabela)
-                                    .fetch();
-
-        Record valores = resultados.iterator().next() ;
-
         List<String> queryList = new ArrayList<>();
+        try
+        {
+            DSLContext dsl = DSL.using(conexaoCloud);
+            Table<Record> tabelaRecord = DSL.table(tabela);
 
-        queryList.add(dsl.insertInto(tabelaRecord) 
-                                .columns(tabelaRecord.fields()) 
-                                .values(valores) 
-                                .getSQL(ParamType.INLINED)); 
+            Result<Record> resultados = dsl.select()
+                                        .from(tabela)
+                                        .fetch();
 
+            Record valores = resultados.iterator().next() ;
+
+
+            queryList.add(dsl.insertInto(tabelaRecord) 
+                                    .columns(tabelaRecord.fields()) 
+                                    .values(valores) 
+                                    .getSQL(ParamType.INLINED)); 
+
+        }
+        catch (NoSuchElementException e)
+        {
+            System.out.println("Elemento não encontrado: " + e.getMessage());
+        }
         return queryList;
     }
 
@@ -137,9 +147,11 @@ public class OperacaoBancoService
 
         return resultado;
     }
-
-    public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela, Map<String, Object> response) throws SQLException
+    public void cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
     {
+
+        Map<String, Object> insertCache = new LinkedHashMap<>();
+
         final int BATCH_SIZE = 1000;
         final int PAGE_SIZE = 50000;
         long offset = 0;
@@ -171,14 +183,14 @@ public class OperacaoBancoService
                             if (++batchCount % BATCH_SIZE == 0)
                             {
                                 localInsert.executeBatch();
-                                conexaoLocal.commit();
+                                // conexaoLocal.commit();
                             }
                         }
 
                         if (batchCount > 0)
                         {
                             localInsert.executeBatch();
-                            conexaoLocal.commit();
+                            // conexaoLocal.commit();
                         }
 
                         localInsert.close();
@@ -196,6 +208,27 @@ public class OperacaoBancoService
 
             // response.put("message", "Sincronização da tabela "+tabela+" concluida.");
 
+        }
+        catch(BatchUpdateException e)
+        {
+            conexaoLocal.rollback();
+            // System.err.println("Erro durante a execução do lote: " + e.getMessage());
+            
+            SQLException nextException = e.getNextException();
+            while (nextException != null)
+            {
+                if (nextException.getMessage().contains("duplicate key value violates unique constraint"))
+                {
+                    System.err.println("Erro: Chave duplicada detectada. Registro já existe na tabela "+tabela+".");
+                    throw new RuntimeException("Erro: Chave duplicada detectada. Registro já existe na tabela "+tabela+".");
+                }
+                else
+                {
+                    System.err.println("Outro erro SQL: " + nextException.getMessage());
+                }
+                nextException = nextException.getNextException();
+            }
+            throw new RuntimeException("Falha ao executar batch", e);
         }
         catch (SQLException e)
         {

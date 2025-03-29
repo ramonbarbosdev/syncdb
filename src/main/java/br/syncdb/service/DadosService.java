@@ -349,7 +349,7 @@ public class DadosService
             return null;
         }
 
-        if(maxLocalId == 0)
+        if(maxLocalId == 0 && countLocal == 0)
         {
             parametros.put("novo", true);
         }
@@ -370,7 +370,46 @@ public class DadosService
         return parametros;
     }
 
-    public  Map<String, Object>  obterTabelasOrganizada(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+    public  Map<String, Object>  obterTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+    {
+        Map<String, Object> retorno = new HashMap<String, Object>();
+        
+        Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
+        List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
+        
+        for(String itemTabela : tabelas)
+        {        
+            Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
+
+            if(parametros != null)
+            {
+                if ((Boolean) parametros.get("novo"))
+                {
+                    atualizarSequencias(conexaoLocal, tabela);
+
+                    operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
+
+                    System.out.println("Criacao da script da '"+itemTabela+"'.");
+                } 
+                else if ((Boolean) parametros.get("existente"))
+                {
+                    System.out.println("Tabela '"+itemTabela+"' com atualizações de dados pendendes.");
+                } 
+                else
+                {
+                    System.out.println("Tabela '"+itemTabela+"' não possui atualizações de dados pendentes.");
+                }
+                
+            }
+            
+
+        }
+
+
+        return retorno;
+            
+    }
+    public  Map<String, Object>  obterTabelasPendentesAlteracao(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
     {
         Map<String, Object> retorno = new HashMap<String, Object>();
         
@@ -388,9 +427,10 @@ public class DadosService
             {
                 if ((Boolean) parametros.get("novo"))
                 {
-                    List<String> novosRegistros =  operacaoBancoService.registroNovo( conexaoCloud, itemTabela);
-                    novoQuery.addAll(novosRegistros);
-                    System.out.println("Script de criacao '"+itemTabela+"' concluida.");
+                    // atualizarSequencias(conexaoLocal, tabela);
+                    // List<String> novosRegistros =  operacaoBancoService.registroNovo( conexaoCloud, itemTabela);
+                    // novoQuery.addAll(novosRegistros);
+                    System.out.println("Nescessario a criacao da tabela '"+itemTabela+"'.");
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
@@ -398,8 +438,12 @@ public class DadosService
         
                     incrementoQuery.put(itemTabela, resultadoIncremento.get("insert")); 
                     incrementoQuery.put(itemTabela, resultadoIncremento.get("delete")); 
-                    System.out.println("Script de alteração '"+itemTabela+"' concluida.");
+                    System.out.println("Tabela '"+itemTabela+"' com atualizações pendendes.");
                 } 
+                else
+                {
+                    System.out.println("Tabela '"+itemTabela+"' não possui atualizações pendentes.");
+                }
                 
             }
             
@@ -544,7 +588,6 @@ public class DadosService
             // System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
             id = registrosDesconhecidos.iterator().next() ;
             resutadoQuery.put("delete", operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
-
         }
         
         Set<Long> registrosExtras = new HashSet<>(registrosCloud);
