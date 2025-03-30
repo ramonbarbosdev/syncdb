@@ -31,6 +31,7 @@ import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.syncdb.model.TabelaDetalhe;
 import jakarta.persistence.criteria.CriteriaBuilder;
 
 @Service
@@ -370,49 +371,57 @@ public class DadosService
         return parametros;
     }
 
-    public   Map<String,List<String>> obterTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException
+    public  void obterTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela, List<TabelaDetalhe> detalhes,   Map<String,List<String>> querys) throws SQLException
     {
-
-        Map<String,List<String>> sqlCache =  new LinkedHashMap<>();
 
         Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
         List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
+
+        TabelaDetalhe infoDetalhe = new TabelaDetalhe();
+
+        if(tabelas.size() == 0)
+        {
+            throw new SQLException("Tabela "+tabela+" não encontrada.");
+        }
         
         for(String itemTabela : tabelas)
         {        
             Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
 
+            infoDetalhe.setTabela(itemTabela);
+
             if(parametros != null)
             {
                 if ((Boolean) parametros.get("novo"))
                 {
-                    atualizarSequencias(conexaoLocal, tabela);
-
+                    atualizarSequencias(conexaoLocal, itemTabela);
                     List<String> script = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
-
-                    sqlCache.put(itemTabela,script);
+                    
+                    infoDetalhe.setAcao("Inserção");
+                    infoDetalhe.setLinhaInseridas(script.size());
+                    querys.put(itemTabela,script);
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
                     String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
-
                     List<String> script = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);
-                    sqlCache.put(itemTabela,script);
-
+                    
+                    infoDetalhe.setAcao("Atualização");
+                    infoDetalhe.setLinhaAtualizadas(script.size());
+                    querys.put(itemTabela,script);
                     System.out.println("Tabela '"+itemTabela+"' com atualizações de dados pendendes.");
-                    // verificarConsistenciaDados( conexaoLocal,  conexaoCloud,  tabela,  pkColumn) ;
                 } 
                 else
                 {
                     System.out.println("Tabela '"+itemTabela+"' não possui atualizações de dados pendentes.");
                 }
                 
+                detalhes.add(infoDetalhe);
             }
             
         }
 
-        return sqlCache;
             
     }
   

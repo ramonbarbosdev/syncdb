@@ -36,6 +36,7 @@ import br.syncdb.config.CacheManager;
 import br.syncdb.config.ConexaoBanco;
 import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
+import br.syncdb.model.TabelaDetalhe;
 
 @Service
 public class SincronizacaoService
@@ -62,6 +63,8 @@ public class SincronizacaoService
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
         Map<String, Object> response = new HashMap<String, Object>();
+        List<TabelaDetalhe> detalhes = new ArrayList<>();
+        Map<String,List<String>> querys =  new LinkedHashMap<>(); 
        
         try
         {
@@ -71,7 +74,7 @@ public class SincronizacaoService
 
             dadosService.desativarConstraints(conexaoLocal);
 
-            Map<String,List<String>>  querys = dadosService.obterTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela );
+            dadosService.obterTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela, detalhes, querys );
 
             //incluir no cache'
 
@@ -82,6 +85,7 @@ public class SincronizacaoService
 
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
+            response.put("tabelas_afetadas", detalhes); 
             response.put("success", true); 
             response.put("message", "Sincronização de dados concluida"); 
 
@@ -105,7 +109,7 @@ public class SincronizacaoService
         Map<String, Object> response = new LinkedHashMap<>(); 
 
         Connection conexaoCloud = null;
-        Connection conexaoLocal = null;
+        Connection conexaoLocal = null; 
         try
         {
              conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
