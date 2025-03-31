@@ -23,7 +23,7 @@ import org.jooq.impl.DSL;
 import org.jooq.Record;
 import org.jooq.Result;
 import org.jooq.impl.SQLDataType;
-
+import org.jooq.util.postgres.PGobject;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -171,6 +171,11 @@ public class OperacaoBancoService
         // Map para armazenar as instruções SQL (cache)
         List<String> sqlCache = new ArrayList<>();
 
+        if(tabela.equals("alteracao_orcamentaria"))
+        {
+            System.out.println(tabela);
+        }
+
         final int BATCH_SIZE = 1000;
         final int PAGE_SIZE = 50000;
         long offset = 0;
@@ -204,10 +209,15 @@ public class OperacaoBancoService
                     }
                 }
             }
-        } catch (BatchUpdateException e) {
+        
+        }
+        catch (BatchUpdateException e)
+        {
             conexaoLocal.rollback();
             handleBatchUpdateException(e, tabela);
-        } catch (SQLException e) {
+        }
+        catch (SQLException e)
+        {
             conexaoLocal.rollback();
             throw e;
         }
@@ -217,7 +227,11 @@ public class OperacaoBancoService
     }
 
     // Método para construir a instrução SQL de INSERT
-    private String construirInsertSQL(String tabela, ResultSet rs) throws SQLException {
+    private String construirInsertSQL(String tabela, ResultSet rs) throws SQLException
+    {
+        // if(!tabela.equals("item_estrutura_operacao")) return null;
+       
+
         StringBuilder sql = new StringBuilder("INSERT INTO ");
         sql.append(tabela).append(" (");
     
@@ -225,7 +239,8 @@ public class OperacaoBancoService
         int columnCount = metaData.getColumnCount();
     
         // Adicionar os nomes das colunas
-        for (int i = 1; i <= columnCount; i++) {
+        for (int i = 1; i <= columnCount; i++)
+        {
             sql.append(metaData.getColumnName(i));
             if (i < columnCount) {
                 sql.append(", ");
@@ -237,28 +252,47 @@ public class OperacaoBancoService
         // Adicionar os valores das colunas
         for (int i = 1; i <= columnCount; i++) {
             Object value = rs.getObject(i);
-            if (value == null) {
-                sql.append("NULL"); // Tratar valores nulos
-            } else if (value instanceof String) {
-                // Escapar apóstrofos em strings
+            String columnTypeName = metaData.getColumnTypeName(i);
+
+            if (value == null)
+            {
+                sql.append("NULL"); 
+            }
+            else if (value instanceof String)
+            {
+             
                 sql.append("'").append(escapeApostrophe(value.toString())).append("'");
-            } else if (value instanceof java.util.Date) {
-                // Formatar datas para o padrão SQL
+            }
+            else if (value instanceof java.util.Date)
+            {
+              
                 sql.append("'").append(new java.sql.Timestamp(((java.util.Date) value).getTime())).append("'");
-            } else {
+            }
+            else if (value instanceof org.postgresql.util.PGobject && "jsonb".equals(columnTypeName))
+            {
+                org.postgresql.util.PGobject pg = (org.postgresql.util.PGobject) value;
+                sql.append("'").append(escapeApostrophe(pg.getValue())).append("'::jsonb");
+            }
+            else
+            {
                 sql.append(value);
             }
-            if (i < columnCount) {
+
+            if (i < columnCount)
+            {
                 sql.append(", ");
             }
         }
     
         sql.append(");");
     
-        return sql.toString();
+        String sqlString = sql.length() > 0 ?  sql.toString() : "" ;
+
+        return sqlString;
     }
 
-    private String escapeApostrophe(String value) {
+    private String escapeApostrophe(String value)
+    {
         return value.replace("'", "''");
     }
 

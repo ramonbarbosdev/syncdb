@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.Map.Entry;
 
+import org.jooq.exception.DataAccessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -76,18 +77,17 @@ public class SincronizacaoService
 
             dadosService.obterTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela, detalhes, querys );
 
-            //incluir no cache'
+            response.put("tabelas_afetadas", detalhes); 
 
             if(fl_verificacao == false)
             {
                 operacaoBancoService.execultarQuerySQL(conexaoLocal,querys);
+                response.put("message", "Sincronização de dados concluida"); 
             }
-
+            
+            response.put("success", true); 
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
-            response.put("tabelas_afetadas", detalhes); 
-            response.put("success", true); 
-            response.put("message", "Sincronização de dados concluida"); 
 
         }
         catch (Exception e)

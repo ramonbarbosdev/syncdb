@@ -377,7 +377,6 @@ public class DadosService
         Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
         List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
 
-        TabelaDetalhe infoDetalhe = new TabelaDetalhe();
 
         if(tabelas.size() == 0)
         {
@@ -388,28 +387,40 @@ public class DadosService
         {        
             Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
 
-            infoDetalhe.setTabela(itemTabela);
-
             if(parametros != null)
             {
+                TabelaDetalhe infoDetalhe = new TabelaDetalhe();
+
                 if ((Boolean) parametros.get("novo"))
                 {
                     atualizarSequencias(conexaoLocal, itemTabela);
                     List<String> script = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
                     
-                    infoDetalhe.setAcao("Inserção");
-                    infoDetalhe.setLinhaInseridas(script.size());
-                    querys.put(itemTabela,script);
+
+                    if(script.size() > 0)
+                    {
+                        infoDetalhe.setTabela(itemTabela);
+                        infoDetalhe.setAcao("Inserção");
+                        infoDetalhe.setLinhaInseridas(script.size());
+                        detalhes.add(infoDetalhe);
+                        querys.put(itemTabela,script);
+                    }
+                   
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
                     String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
-                    List<String> script = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);
-                    
-                    infoDetalhe.setAcao("Atualização");
-                    infoDetalhe.setLinhaAtualizadas(script.size());
-                    querys.put(itemTabela,script);
+                    List<String> script = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);               
+
+                    if(script.size() > 0)
+                    {
+                        infoDetalhe.setTabela(itemTabela);
+                        infoDetalhe.setAcao("Atualização");
+                        infoDetalhe.setLinhaAtualizadas(script.size());
+                        detalhes.add(infoDetalhe);
+                        querys.put(itemTabela,script);
+                    }
                     System.out.println("Tabela '"+itemTabela+"' com atualizações de dados pendendes.");
                 } 
                 else
@@ -417,7 +428,6 @@ public class DadosService
                     System.out.println("Tabela '"+itemTabela+"' não possui atualizações de dados pendentes.");
                 }
                 
-                detalhes.add(infoDetalhe);
             }
             
         }
