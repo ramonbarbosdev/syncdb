@@ -75,13 +75,13 @@ public class SincronizacaoService
 
             dadosService.desativarConstraints(conexaoLocal);
 
-            dadosService.obterTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela, detalhes, querys );
+            dadosService.obterDadosTabelasPendentesCriacao(conexaoCloud,conexaoLocal, tabela, detalhes, querys );
 
             response.put("tabelas_afetadas", detalhes); 
 
             if(fl_verificacao == false)
             {
-                // operacaoBancoService.execultarQuerySQL(conexaoLocal,querys);
+                operacaoBancoService.execultarQuerySQL(conexaoLocal,querys);
                 response.put("message", "Sincronização de dados concluida"); 
             }
             

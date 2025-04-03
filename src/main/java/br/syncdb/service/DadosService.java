@@ -60,16 +60,31 @@ public class DadosService
                 return (Long) null;
             }
         }
+
+        String sqlCheck = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = ?)";
+
+        try (PreparedStatement stmtCheck = conexao.prepareStatement(sqlCheck))
+        {
+            stmtCheck.setString(1, tabela);
+            try (ResultSet rsCheck = stmtCheck.executeQuery())
+            {
+                if (rsCheck.next() && !rsCheck.getBoolean(1))
+                {
+                    throw new SQLException("A tabela '" + tabela + "' não existe.");
+                }
+            }
+        }
     
-        // Consulta que verifica se o valor é numérico antes de calcular o máximo
         String sql = String.format(
             "SELECT COALESCE(MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END), 0) FROM %s", 
             nomeColuna, nomeColuna, tabela);
         
         try (PreparedStatement stmt = conexao.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
+             ResultSet rs = stmt.executeQuery())
+        {
             
-            if (rs.next()) {
+            if (rs.next())
+            {
                 return rs.getLong(1);
             }
             return 0;
@@ -153,8 +168,6 @@ public class DadosService
 
         Map<String, Object> response = new LinkedHashMap<>(); 
         Map<String, Object> parametrosMap = new HashMap<String, Object>();
-
-        estruturaService.validarEstruturaTabela(conexaoCloud, conexaoLocal, tabela);
 
         Map<String, Set<String>> dependencias = obterDependenciasTabelas(conexaoCloud);
 
@@ -341,6 +354,8 @@ public class DadosService
            return null;
         }
 
+        // estruturaService.validarEstruturaTabela(conexaoCloud, conexaoLocal, tabela);
+        
         long maxCloudId = obterMaxId(conexaoCloud, tabela, pkColumn);
         long maxLocalId = obterMaxId(conexaoLocal, tabela, pkColumn);
         int countCloud = obterQuantidadeRegistro(conexaoCloud, tabela);
@@ -372,7 +387,7 @@ public class DadosService
         return parametros;
     }
 
-    public  void obterTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela, List<TabelaDetalhe> detalhes,   Map<String,List<String>> querys) throws SQLException
+    public  void obterDadosTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela, List<TabelaDetalhe> detalhes,   Map<String,List<String>> querys) throws SQLException
     {
 
         Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
@@ -387,7 +402,6 @@ public class DadosService
         for(String itemTabela : tabelas)
         {        
             Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
-
 
             if(parametros != null)
             {
@@ -485,7 +499,7 @@ public class DadosService
             
         if (!registrosDesconhecidos.isEmpty())
         {
-            System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
+            // System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
             id = registrosDesconhecidos.iterator().next() ;
             resutadoQuery.put("delete", operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
             sqlCache.addAll( operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
@@ -497,9 +511,9 @@ public class DadosService
         
         if (!registrosExtras.isEmpty())
         {
-            System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
+            // System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
             id = registrosExtras.iterator().next() ;
-            // sqlCache.addAll(operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
+            sqlCache.addAll(operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
 
         }
         
