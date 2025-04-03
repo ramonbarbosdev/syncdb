@@ -84,6 +84,7 @@ public class DadosService
             if (rs.next()) {
                 return rs.getString("COLUMN_NAME");
             }
+
             return null;
         }
     }
@@ -387,15 +388,16 @@ public class DadosService
         {        
             Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
 
+
             if(parametros != null)
             {
                 TabelaDetalhe infoDetalhe = new TabelaDetalhe();
 
                 if ((Boolean) parametros.get("novo"))
                 {
+                    System.out.println("Criacao da script da '"+itemTabela+"'.");
                     atualizarSequencias(conexaoLocal, itemTabela);
                     List<String> script = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
-                    
 
                     if(script.size() > 0)
                     {
@@ -406,12 +408,13 @@ public class DadosService
                         querys.put(itemTabela,script);
                     }
                    
-                    System.out.println("Criacao da script da '"+itemTabela+"'.");
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
-                    String pkColumn =  obterNomeColunaPK(conexaoCloud, tabela);
-                    List<String> script = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);               
+                  
+                    System.out.println("Tabela '"+itemTabela+"' com atualizações de dados pendendes.");
+                    String pkColumn =  obterNomeColunaPK(conexaoCloud, itemTabela);
+                    List<String> script = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);  
 
                     if(script.size() > 0)
                     {
@@ -421,7 +424,6 @@ public class DadosService
                         detalhes.add(infoDetalhe);
                         querys.put(itemTabela,script);
                     }
-                    System.out.println("Tabela '"+itemTabela+"' com atualizações de dados pendendes.");
                 } 
                 else
                 {
@@ -483,7 +485,7 @@ public class DadosService
             
         if (!registrosDesconhecidos.isEmpty())
         {
-            // System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
+            System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
             id = registrosDesconhecidos.iterator().next() ;
             resutadoQuery.put("delete", operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
             sqlCache.addAll( operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
@@ -495,9 +497,9 @@ public class DadosService
         
         if (!registrosExtras.isEmpty())
         {
-            // System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
+            System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
             id = registrosExtras.iterator().next() ;
-            sqlCache.addAll(operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
+            // sqlCache.addAll(operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
 
         }
         

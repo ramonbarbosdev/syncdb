@@ -81,7 +81,7 @@ public class SincronizacaoService
 
             if(fl_verificacao == false)
             {
-                operacaoBancoService.execultarQuerySQL(conexaoLocal,querys);
+                // operacaoBancoService.execultarQuerySQL(conexaoLocal,querys);
                 response.put("message", "Sincronização de dados concluida"); 
             }
             
@@ -89,6 +89,10 @@ public class SincronizacaoService
             dadosService.ativarConstraints(conexaoLocal);
             conexaoLocal.commit();
 
+        }
+        catch (DataAccessException e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
         }
         catch (Exception e)
         {
@@ -157,7 +161,7 @@ public class SincronizacaoService
     }
 
     
-    private void tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)
+    private void    tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)
     {
         if (conexaoLocal != null)
         {
