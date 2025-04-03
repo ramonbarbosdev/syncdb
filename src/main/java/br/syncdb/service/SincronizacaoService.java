@@ -37,6 +37,7 @@ import br.syncdb.config.CacheManager;
 import br.syncdb.config.ConexaoBanco;
 import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
+import br.syncdb.model.EstruturaTabela;
 import br.syncdb.model.TabelaDetalhe;
 
 @Service
@@ -111,6 +112,7 @@ public class SincronizacaoService
     public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela )
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
+        List<EstruturaTabela> detalhes = new ArrayList<>();
 
         Connection conexaoCloud = null;
         Connection conexaoLocal = null; 
@@ -122,8 +124,10 @@ public class SincronizacaoService
             Set<String> tabelasLocal = estruturaService.obterTabelas(conexaoLocal, base);
             Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
 
-            estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, response,base, nomeTabela);
-           
+            estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
+            
+            response.put("tabelas_afetadas", detalhes); 
+            response.put("success", true); 
         }
         catch (SQLException e)
         {

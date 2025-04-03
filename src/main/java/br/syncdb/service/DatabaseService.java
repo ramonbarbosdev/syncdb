@@ -33,6 +33,7 @@ import br.syncdb.config.DatabaseConnection;
 import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
 import br.syncdb.model.TableMetadata;
+import br.syncdb.utils.DicionarioTipoSql;
 
 
 @Service
@@ -147,8 +148,6 @@ public class DatabaseService
     }
     public String criarEstuturaTabela(Connection conexao, String nomeTabela) throws SQLException
     {
-
-        System.out.println("Criando estrutura da tabela: " + nomeTabela);
 
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
@@ -506,15 +505,15 @@ public class DatabaseService
 
     /////////////////////////
     public String compararEstruturaTabela(Connection conexaoCloud, Connection conexaoLocal, 
-            String nomeTabela) throws SQLException {
+            String nomeTabela) throws SQLException
+    {
         
         StringBuilder alteracoes = new StringBuilder();
         
-        System.out.println("Verificando alteracao na tabela: " + nomeTabela);
-
         Map<String, Coluna> estruturaCloud = obterEstruturaColunas(conexaoCloud, nomeTabela);
         Map<String, Coluna> estruturaLocal = obterEstruturaColunas(conexaoLocal, nomeTabela);
         
+       
         compararColunas(alteracoes, nomeTabela, estruturaCloud, estruturaLocal);
         compararColunasRemovidas(alteracoes, nomeTabela, estruturaCloud, estruturaLocal);
         
@@ -528,14 +527,25 @@ public class DatabaseService
         Map<String, Coluna> estrutura = new HashMap<>();
         DatabaseMetaData metaData = conexao.getMetaData();
         
+        if(nomeTabela.contains("tipo_competencia"))
+        {
+            System.out.println(nomeTabela);
+        }
+
+
         try (ResultSet colunas = metaData.getColumns(null, "public", nomeTabela, null)) {
-            while (colunas.next()) {
+            while (colunas.next())
+            {
                 Coluna coluna = new Coluna();
                 coluna.setNome(colunas.getString("COLUMN_NAME"));
-                coluna.setTipo(colunas.getString("TYPE_NAME"));
                 coluna.setNullable(colunas.getInt("NULLABLE") == DatabaseMetaData.columnNullable);
                 coluna.setDefaultValor(colunas.getString("COLUMN_DEF"));
                 
+                String tipoOriginal = colunas.getString("TYPE_NAME").toLowerCase();
+                String tipoConvertido = DicionarioTipoSql.getTipoConvertido(tipoOriginal);
+                coluna.setTipo(tipoConvertido);
+
+
                 estrutura.put(coluna.getNome().toLowerCase(), coluna);
             }
         }

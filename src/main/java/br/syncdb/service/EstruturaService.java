@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.syncdb.model.EstruturaTabela;
+
 @Service
 public class EstruturaService {
     
@@ -37,15 +39,16 @@ public class EstruturaService {
     
     public void processarTabelas(Connection conexaoCloud,
     Connection conexaoLocal,
-    Set<String> nomeTabelaCloud,
+    Set<String> tabelasCloud,
     Set<String> nomeTabelaLocal,
-    Map<String, Object> response,
+    List<EstruturaTabela> detalhes,
     String base,
     String nomeTabelaUni
     ) 
     throws SQLException
     {
-        
+        //TO:DO - FAZER RETORNO 
+        //TO:DO - ACHAR A ORIGEM DO ERRO
         String pastaQueries = "src\\main\\java\\br\\syncdb\\query\\queries_"+base;
         File diretorio = new File(pastaQueries);
         
@@ -55,7 +58,6 @@ public class EstruturaService {
         }
 
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
-        List<String> atualizacaoSequencias = Collections.synchronizedList(new ArrayList<>());
         List<String> funcoes = Collections.synchronizedList(new ArrayList<>());
         List<String> criacoesTabela = Collections.synchronizedList(new ArrayList<>());
         List<String> chavesEstrangeiras = Collections.synchronizedList(new ArrayList<>());
@@ -66,45 +68,51 @@ public class EstruturaService {
         if (sequenciaQuery != null)
         {
             sequencias.add(sequenciaQuery);
-            response.put("sequencia", "SEQUENCIA_CRIADA");
         }
-
-        int threadCount = Math.min(Runtime.getRuntime().availableProcessors() * 2, 16);
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        
-        try 
+    
+        for (String itemTabela : tabelasCloud)
         {
+            EstruturaTabela infoEstrutura = new EstruturaTabela();
             
-            List<CompletableFuture<Void>> futures = nomeTabelaCloud.stream()
-            .map(tabela -> CompletableFuture.runAsync(() ->
+            if (!nomeTabelaLocal.contains(itemTabela))
             {
-                if (nomeTabelaUni != null && !tabela.equals( nomeTabelaUni))
+                System.out.println("Criando estrutura da tabela: " + itemTabela);
+                
+                String createTable = databaseService.criarEstuturaTabela(conexaoCloud, itemTabela);
+                if (createTable != null)
                 {
-                    return; 
+                    criacoesTabela.add(createTable);
+                    infoEstrutura.setTabela(itemTabela);
+                    infoEstrutura.setAcao("create");
+                    infoEstrutura.setQuerys(createTable.length());
+                    detalhes.add(infoEstrutura);
                 }
+                
+                String fkQuery = databaseService.obterChaveEstrangeira(conexaoCloud, itemTabela);
+                if (fkQuery != null)
+                {
+                    chavesEstrangeiras.add(fkQuery);
+                }
+
+            }
+            else
+            {
+                System.out.println("Verificando alteracao na tabela: " + itemTabela);
+
+                String alterQuery = databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, itemTabela);
+             
+                if (alterQuery != null)
+                {
+                    alteracoes.add(alterQuery);
+                    infoEstrutura.setTabela(itemTabela);
+                    infoEstrutura.setAcao("update");
+                    infoEstrutura.setQuerys(alterQuery.length());
+                    detalhes.add(infoEstrutura);
+                }
+               
+            }
+        }
         
-                 processarTabelaIndividual(conexaoCloud, conexaoLocal, tabela,  nomeTabelaLocal, criacoesTabela, chavesEstrangeiras, alteracoes ,   atualizacaoSequencias,response);
-              
-
-            }, executor))
-            .collect(Collectors.toList());
-  
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get();
-
-        }
-        catch (InterruptedException e)
-        {
-            Thread.currentThread().interrupt();
-            throw new SQLException("Processamento interrompido", e);
-        }
-        catch (ExecutionException e)
-        {
-            throw new SQLException("Erro durante processamento paralelo", e);
-        } 
-        finally
-        {
-            executor.shutdownNow();
-        }
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Sequências", sequencias);
@@ -113,68 +121,13 @@ public class EstruturaService {
         queries.put("Alterações",alteracoes);
         // queries.put("Criação de Tabelas", funcoes);
         
-        executarQueriesEmLotes(conexaoLocal, queries, response);
+        executarQueriesEmLotes(conexaoLocal, queries);
         
         // queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
         // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
-    private void processarTabelaIndividual(Connection conexaoCloud, Connection conexaoLocal,
-        String nomeTabela,
-        Set<String> nomeTabelaLocal,
-        List<String> criacoesTabela,
-        List<String> chavesEstrangeiras,
-        List<String> alteracoes,
-        List<String> atualizacaoSequencias,
-        Map<String, Object> response)
-    {
-        try
-        {
-
-           
-            if (!nomeTabelaLocal.contains(nomeTabela))
-            {
-                
-                String createTable = databaseService.criarEstuturaTabela(conexaoCloud, nomeTabela);
-
-                if (createTable != null)
-                {       
-                    criacoesTabela.add(createTable);
-                }
-                
-                String fkQuery = databaseService.obterChaveEstrangeira(conexaoCloud, nomeTabela);
-
-                if (fkQuery != null)
-                {
-                    chavesEstrangeiras.add(fkQuery);
-                }
-                response.put(nomeTabela + "_status", "CRIACAO_CONCLUIDA");
-
-            }
-            else
-            {
-                String alterQuery = databaseService.compararEstruturaTabela(conexaoCloud, conexaoLocal, nomeTabela);
-
-                if (alterQuery != null)
-                {                  
-                    alteracoes.add(alterQuery);
-                    response.put(nomeTabela + "_status", "ALTERACAO_CONCLUIDA");
-                }
-            }
-
-        }
-        catch (SQLException e)
-        {
-            logRetorno("Erro ao processar tabela " + nomeTabela, e);
-        }
-
-  
-    }
-
-
-
-
-    private void executarQueriesEmLotes(Connection conexaoLocal, HashMap<String, List<String>> queries, Map<String, Object> response) throws SQLException
+    private void executarQueriesEmLotes(Connection conexaoLocal, HashMap<String, List<String>> queries) throws SQLException
     {
         
         conexaoLocal.setAutoCommit(false);
@@ -183,7 +136,7 @@ public class EstruturaService {
         {
             for (String i : queries.keySet())
             {
-                executarLoteComThreadPool(conexaoLocal, queries.get(i), i, response);
+                executarLoteComThreadPool(conexaoLocal, queries.get(i), i);
             }
            
             conexaoLocal.commit();
@@ -195,16 +148,14 @@ public class EstruturaService {
         }
     }
 
-    private void executarLoteComThreadPool(Connection conexao, List<String> queries, String tipo, Map<String, Object> response) 
+    private void executarLoteComThreadPool(Connection conexao, List<String> queries, String tipo) 
         throws SQLException
     {
         
-        response.put("success", true);
 
         if (queries.isEmpty())
         {
             System.out.printf("[%s] Nenhuma query para executar.%n", tipo);
-            response.put("["+tipo+"]", "Nenhuma query para executar.");
             return;
         }
 
@@ -219,7 +170,6 @@ public class EstruturaService {
             CountDownLatch latch = new CountDownLatch(queries.size());
 
             System.out.printf("[%s] Iniciando execução de %d queries%n", tipo, queries.size());
-            long startTime = System.currentTimeMillis();
 
             for (String query : queries)
             {
@@ -239,13 +189,8 @@ public class EstruturaService {
                     }
                     catch (SQLException e)
                     {
-                        
                         errorCount.incrementAndGet();
-                        logRetorno(String.format("[%s] Erro na query", tipo), e);
-
-                        response.put("success", false);
-                        response.put("message", "Erro na query");
-                        response.put("details", e.getMessage());
+                        System.err.println("["+tipo+"] Erro na query: "+query+"" );
 
                     }
                     finally
@@ -258,18 +203,12 @@ public class EstruturaService {
 
             // Aguardar conclusão
             latch.await();
-            
-            // Log final
-            long duration = System.currentTimeMillis() - startTime;
-
-            // response.put("message", "Concluído em "+duration+" ms. Sucessos: "+successCount.get()+", Erros: "+errorCount.get()+"");
-
+ 
             if (errorCount.get() > 0)
             {
                 throw new SQLException(String.format("%d erros durante execução de %s", errorCount.get(), tipo));
             }
             
-            response.put("message", "Tabelas Sincronizadas.");
             
         }
         catch (InterruptedException e)
