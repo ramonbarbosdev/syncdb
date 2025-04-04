@@ -16,7 +16,6 @@ public class ConfiguracaoBanco {
     {
         String perfil = "dev"; 
 
-
         try (InputStream baseInput = ConfiguracaoBanco.class.getClassLoader().getResourceAsStream("application.properties")) {
             if (baseInput != null)
             {
@@ -30,26 +29,34 @@ public class ConfiguracaoBanco {
                 }
 
                 System.out.println("Perfil ativo detectado: " + perfil);
-            } else {
+            }
+            else
+            {
                 System.out.println("Arquivo application.properties não encontrado. Usando perfil padrão: " + perfil);
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             throw new RuntimeException("Erro ao carregar application.properties", e);
         }
 
         String nomeArquivo = "application-" + perfil + ".properties";
-        try (InputStream input = ConfiguracaoBanco.class.getClassLoader().getResourceAsStream(nomeArquivo)) {
-            if (input == null) {
+        try (InputStream input = ConfiguracaoBanco.class.getClassLoader().getResourceAsStream(nomeArquivo))
+        {
+            if (input == null)
+            {
                 throw new RuntimeException("Arquivo " + nomeArquivo + " não encontrado.");
             }
             properties.load(input);
             System.out.println("Configuração carregada: " + nomeArquivo);
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             throw new RuntimeException("Erro ao carregar configurações do arquivo " + nomeArquivo, e);
         }
     }
 
-    public static String get(String key) {
+    public static String get(String key)
+    {
         return properties.getProperty(key);
     }
 }
