@@ -12,17 +12,20 @@ public class ConfiguracaoBanco {
         carregarConfiguracoes();
     }
 
-    private static void carregarConfiguracoes() {
-        String perfil = "dev"; // perfil padrão
+    private static void carregarConfiguracoes()
+    {
+        String perfil = "dev"; 
 
-        // 1. Tenta ler o application.properties principal
+
         try (InputStream baseInput = ConfiguracaoBanco.class.getClassLoader().getResourceAsStream("application.properties")) {
-            if (baseInput != null) {
+            if (baseInput != null)
+            {
                 Properties baseProps = new Properties();
                 baseProps.load(baseInput);
 
                 String perfilDetectado = baseProps.getProperty("spring.profiles.active");
-                if (perfilDetectado != null && !perfilDetectado.isBlank()) {
+                if (perfilDetectado != null && !perfilDetectado.isBlank())
+                {
                     perfil = perfilDetectado;
                 }
 
@@ -34,7 +37,6 @@ public class ConfiguracaoBanco {
             throw new RuntimeException("Erro ao carregar application.properties", e);
         }
 
-        // 2. Agora carrega o application-<perfil>.properties correspondente
         String nomeArquivo = "application-" + perfil + ".properties";
         try (InputStream input = ConfiguracaoBanco.class.getClassLoader().getResourceAsStream(nomeArquivo)) {
             if (input == null) {
