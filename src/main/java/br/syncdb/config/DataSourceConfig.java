@@ -10,12 +10,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-@Configuration
+// @Configuration
 public class DataSourceConfig
 {
     @Bean
     @Primary /*Banco de dados original */
-    @ConfigurationProperties("spring.datasource.local")
+    @ConfigurationProperties("spring.datasource")
     public DataSourceProperties localDataSourceProperties()
     {
         return new DataSourceProperties();
@@ -29,8 +29,8 @@ public class DataSourceConfig
     }
 
     @Bean
-    @Qualifier("localDataSource")
-    public JdbcTemplate localJdbcTemplate(@Qualifier("localDataSource") DataSource dataSource) {
+    @Qualifier("dataSource")
+    public JdbcTemplate localJdbcTemplate(@Qualifier("dataSource") DataSource dataSource) {
         return new JdbcTemplate(dataSource);
     }
 
