@@ -128,7 +128,8 @@ public class EstruturaService {
     }
 
     private void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries) {
-        for (Map.Entry<String, List<String>> entry : queries.entrySet()) {
+        for (Map.Entry<String, List<String>> entry : queries.entrySet())
+        {
             String tipo = entry.getKey();
             List<String> lista = entry.getValue();
             
