@@ -153,7 +153,8 @@ public class EstruturaService {
                     System.err.println("Erro ao executar query:\n" + query);
                     System.err.println("Mensagem do erro: " + e.getMessage()+ "\n");
 
-                    for (EstruturaTabela detalhe : detalhes) {
+                    for (EstruturaTabela detalhe : detalhes)
+                    {
                         if (detalhe.getTabela().equalsIgnoreCase(tabela))
                         {
                             detalhe.setErro(e.getMessage()); // Supondo que você tenha um campo 'erro' em EstruturaTabela
