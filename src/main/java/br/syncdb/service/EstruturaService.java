@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -20,6 +21,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,7 +87,7 @@ public class EstruturaService {
                     criacoesTabela.add(createTable);
                     infoEstrutura.setTabela(itemTabela);
                     infoEstrutura.setAcao("create");
-                    infoEstrutura.setQuerys(createTable.length());
+                    // infoEstrutura.setQuerys(createTable.length());
                     detalhes.add(infoEstrutura);
                 }
                 
@@ -106,7 +109,7 @@ public class EstruturaService {
                     alteracoes.add(alterQuery);
                     infoEstrutura.setTabela(itemTabela);
                     infoEstrutura.setAcao("update");
-                    infoEstrutura.setQuerys(alterQuery.length());
+                    // infoEstrutura.setQuerys(alterQuery.length());
                     detalhes.add(infoEstrutura);
                 }
                
@@ -121,35 +124,70 @@ public class EstruturaService {
         queries.put("Alterações",alteracoes);
         // queries.put("Criação de Tabelas", funcoes);
         
-        executarQueriesEmLotes(conexaoLocal, queries);
+        executarQueriesEmLotes(conexaoLocal, queries, detalhes);
         
         // queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
         // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
-    private void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries) {
+    private void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries, List<EstruturaTabela> detalhes) {
         for (Map.Entry<String, List<String>> entry : queries.entrySet())
         {
             String tipo = entry.getKey();
             List<String> lista = entry.getValue();
+          
             
             System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
     
             for (String query : lista)
             {
+                String tabela = extrairNomeTabelaDaQuery(query);
+
                 try (Statement stmt = conexao.createStatement())
                 {
                     stmt.execute(query);
-                    System.out.println("✔️ Executada com sucesso:\n" + query);
+                    System.out.println("Executada com sucesso:\n" + query);
                 }
                 catch (SQLException e) 
                 {
-                    System.err.println("❌ Erro ao executar query:\n" + query);
+                    System.err.println("Erro ao executar query:\n" + query);
                     System.err.println("Mensagem do erro: " + e.getMessage()+ "\n");
+
+                    for (EstruturaTabela detalhe : detalhes) {
+                        if (detalhe.getTabela().equalsIgnoreCase(tabela))
+                        {
+                            detalhe.setErro(e.getMessage()); // Supondo que você tenha um campo 'erro' em EstruturaTabela
+                            break;
+                        }
+                    }
                 }
             }
         }
     }
+
+    public String extrairNomeTabelaDaQuery(String query) {
+        query = query.trim().toUpperCase();
+    
+        String patternCreate = "CREATE TABLE IF NOT EXISTS ([\\w\\.]+)";
+        String patternCreateSimple = "CREATE TABLE ([\\w\\.]+)";
+        String patternAlter = "ALTER TABLE ([\\w\\.]+)";
+        String patternForeign = "ALTER TABLE ONLY ([\\w\\.]+)";
+        String patternInsert = "INSERT INTO ([\\w\\.]+)";
+        
+        List<String> patterns = Arrays.asList(patternCreate, patternCreateSimple, patternAlter, patternForeign, patternInsert);
+    
+        for (String patternStr : patterns)
+        {
+            Pattern pattern = Pattern.compile(patternStr);
+            Matcher matcher = pattern.matcher(query);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+    
+        return "desconhecida"; // Caso não consiga identificar
+    }
+    
     
     
 
