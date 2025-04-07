@@ -127,117 +127,30 @@ public class EstruturaService {
         // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
-    private void executarQueriesEmLotes(Connection conexaoLocal, HashMap<String, List<String>> queries) throws SQLException
-    {
-        
-        conexaoLocal.setAutoCommit(false);
-        
-        try
-        {
-            for (String i : queries.keySet())
-            {
-                executarLoteComThreadPool(conexaoLocal, queries.get(i), i);
-            }
-           
-            conexaoLocal.commit();
-        }
-        catch (SQLException e)
-        {
-            conexaoLocal.rollback();
-            throw e;
-        }
-    }
-
-    private void executarLoteComThreadPool(Connection conexao, List<String> queries, String tipo) 
-        throws SQLException
-    {
-        
-
-        if (queries.isEmpty())
-        {
-            System.out.printf("[%s] Nenhuma query para executar.%n", tipo);
-            return;
-        }
-
-        ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-            Math.min(queries.size(), Runtime.getRuntime().availableProcessors() * 2));
-        
-        try
-        {
-            // Contador progresso
-            AtomicInteger successCount = new AtomicInteger(0);
-            AtomicInteger errorCount = new AtomicInteger(0);
-            CountDownLatch latch = new CountDownLatch(queries.size());
-
-            System.out.printf("[%s] Iniciando execução de %d queries%n", tipo, queries.size());
-
-            for (String query : queries)
-            {
-                executor.execute(() -> {
-
-                    try (Statement stmt = conexao.createStatement())
-                    {
-                        stmt.execute(query);
-                        successCount.incrementAndGet();
-                        
-                        if (successCount.get() % 100 == 0)
-                        {
-                            System.out.printf("[%s] Progresso: %d/%d%n", 
-                                            tipo, successCount.get(), queries.size());
-                        }
-
-                    }
-                    catch (SQLException e)
-                    {
-                        errorCount.incrementAndGet();
-                        System.err.println("["+tipo+"] Erro na query: "+query+"" );
-
-                    }
-                    finally
-                    {
-                        latch.countDown();
-                    }
-
-                });
-            }
-
-            // Aguardar conclusão
-            latch.await();
- 
-            if (errorCount.get() > 0)
-            {
-                throw new SQLException(String.format("%d erros durante execução de %s", errorCount.get(), tipo));
-            }
+    private void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries) {
+        for (Map.Entry<String, List<String>> entry : queries.entrySet()) {
+            String tipo = entry.getKey();
+            List<String> lista = entry.getValue();
             
-            
-        }
-        catch (InterruptedException e)
-        {
-            Thread.currentThread().interrupt();
-            throw new SQLException("Execução interrompida", e);
-
-        }
-        finally
-        {
-            executor.shutdownNow();
+            System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
+    
+            for (String query : lista)
+            {
+                try (Statement stmt = conexao.createStatement())
+                {
+                    stmt.execute(query);
+                    System.out.println("✔️ Executada com sucesso:\n" + query);
+                }
+                catch (SQLException e) 
+                {
+                    System.err.println("❌ Erro ao executar query:\n" + query);
+                    System.err.println("Mensagem do erro: " + e.getMessage()+ "\n");
+                }
+            }
         }
     }
-
-    private String logRetorno(String message, Exception e)
-    {
-        String msgRetorno = message;
-
-        if(e != null)
-        {
-            System.err.println(message + ": " + e.getMessage());
-            // e.printStackTrace(System.err);
-
-            msgRetorno = message + ": " + e.getMessage();
-        }
-
-        return msgRetorno;
-       
-    }
+    
+    
 
     public  Set<String> obterTabelas(Connection conexao, String base) throws InterruptedException, ExecutionException, TimeoutException
     {
