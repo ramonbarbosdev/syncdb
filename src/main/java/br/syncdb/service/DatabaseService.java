@@ -266,14 +266,13 @@ public class DatabaseService
 
         String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public';"; 
         try (Statement stmtCloud = conexaoCloud.createStatement();
-             ResultSet rsCloud = stmtCloud.executeQuery(querySequencias)) {
+             ResultSet rsCloud = stmtCloud.executeQuery(querySequencias))
+        {
     
             while (rsCloud.next())
             {
                 String nomeSequenciaCloud = rsCloud.getString("sequencename");
     
-               
-
                 if (!sequenciaExiste(conexaoLocal, nomeSequenciaCloud))
                 {
                     String createSequenceQuery = String.format(
@@ -292,9 +291,11 @@ public class DatabaseService
 
    
 
-    private boolean sequenciaExiste(Connection conexao, String nomeSequencia) throws SQLException {
+    private boolean sequenciaExiste(Connection conexao, String nomeSequencia) throws SQLException
+    {
         String query = "SELECT COUNT(*) FROM pg_class WHERE relname = ? AND relkind = 'S'"; // 'S' para sequência
-        try (PreparedStatement stmt = conexao.prepareStatement(query)) {
+        try (PreparedStatement stmt = conexao.prepareStatement(query))
+        {
             stmt.setString(1, nomeSequencia.trim().toLowerCase());
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {

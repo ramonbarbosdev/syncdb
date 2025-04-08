@@ -406,11 +406,11 @@ public class DadosService
             if(parametros != null)
             {
                 TabelaDetalhe infoDetalhe = new TabelaDetalhe();
+                atualizarSequencias(conexaoLocal, itemTabela);
 
                 if ((Boolean) parametros.get("novo"))
                 {
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
-                    atualizarSequencias(conexaoLocal, itemTabela);
                     List<String> script = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
 
                     if(script.size() > 0)
@@ -571,10 +571,15 @@ public class DadosService
         {
             return ;
         }
+
+        if(nomeTabela.contains("agendamento_lancamento_contabil"))
+        {
+            System.out.println("agendamento_lancamento_contabil");
+        }
     
         String query = String.format(
             "SELECT setval('%s', " +
-            "COALESCE((SELECT MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END) FROM %s), 1), false);",
+            "COALESCE((SELECT MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END) FROM %s), 1) +1, false);",
             seq, pkColumn, pkColumn, nomeTabela);
 
         try (java.sql.Statement statement = connection.createStatement())

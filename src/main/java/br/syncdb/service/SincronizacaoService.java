@@ -118,8 +118,10 @@ public class SincronizacaoService
         Connection conexaoLocal = null; 
         try
         {
-             conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+
+            conexaoLocal.setAutoCommit(false);
 
             Set<String> tabelasLocal = estruturaService.obterTabelas(conexaoLocal, base);
             Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
@@ -128,6 +130,7 @@ public class SincronizacaoService
             
             response.put("tabelas_afetadas", detalhes); 
             response.put("success", true); 
+            conexaoLocal.commit();
         }
         catch (SQLException e)
         {
