@@ -571,11 +571,6 @@ public class DadosService
         {
             return ;
         }
-
-        if(nomeTabela.contains("agendamento_lancamento_contabil"))
-        {
-            System.out.println("agendamento_lancamento_contabil");
-        }
     
         String query = String.format(
             "SELECT setval('%s', " +
