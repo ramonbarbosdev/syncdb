@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   api:
     build:
@@ -7,7 +9,9 @@ services:
     container_name: backend-syncdb
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/syncdb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
