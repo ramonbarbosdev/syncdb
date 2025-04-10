@@ -42,14 +42,46 @@ public class SincronizacaoController
 
 	@Autowired
 	private SincronizacaoService sincronizacaoService;
-	
 
+	@Autowired
+	private DatabaseService databaseService;
+	
+	@GetMapping(value = "/estrutura/bases/", produces = "application/json")
+	public ResponseEntity<?> obterEstruturas ( ) 
+	{
+		List<String> bases = databaseService.listarBases("w5i_tecnologia", TipoConexao.CLOUD);
+
+		if(!bases.isEmpty())
+		{
+			return ResponseEntity.ok(bases);
+		}
+
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"NÃO EXISTE BASES\"}");
+	}
+
+	@GetMapping(value = "/estrutura/verificar/{base}", produces = "application/json")
+	public ResponseEntity<?> verificarEstrutura ( @PathVariable (value = "base") String base ) 
+	{
+		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null, true);
+
+		if ((Boolean) resultado.get("success"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
+
+
+	}
 	
     @GetMapping(value = "/estrutura/{base}", produces = "application/json")
 	public ResponseEntity<?> sincronizacaoEstruturaTotal ( @PathVariable (value = "base") String base ) 
 	{
 	
-		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null);
+		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null, true);
 
 		if ((Boolean) resultado.get("success"))
 		{
@@ -67,7 +99,7 @@ public class SincronizacaoController
 	public ResponseEntity<?> sincronizacaoEstruturaIndividual ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
 	{
 	
-		Map<String, Object> resultado = sincronizacaoService.sincronizarEstrutura(base,  tabela);
+		Map<String, Object> resultado = sincronizacaoService.sincronizarEstrutura(base,  tabela, true);
 
 		if ((Boolean) resultado.get("success"))
 		{

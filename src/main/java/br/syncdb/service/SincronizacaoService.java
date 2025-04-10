@@ -109,11 +109,11 @@ public class SincronizacaoService
     
     
 
-    public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela )
+    public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela, boolean fl_verificacao)
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
         List<EstruturaTabela> detalhes = new ArrayList<>();
-
+        
         Connection conexaoCloud = null;
         Connection conexaoLocal = null; 
         try
@@ -126,8 +126,18 @@ public class SincronizacaoService
             Set<String> tabelasLocal = estruturaService.obterTabelas(conexaoLocal, base);
             Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
 
-            estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
+            HashMap<String, List<String>> queries = estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
             
+            if(fl_verificacao == false)
+            {
+                estruturaService.executarQueriesEmLotes(conexaoLocal, queries, detalhes);
+                response.put("fl_verificacao", fl_verificacao); 
+            }
+            else
+            {
+                response.put("fl_verificacao", fl_verificacao); 
+            }
+
             response.put("tabelas_afetadas", detalhes); 
             response.put("success", true); 
             conexaoLocal.commit();
@@ -137,27 +147,9 @@ public class SincronizacaoService
             tratarErroSincronizacao(response, conexaoLocal, e);
         
         }
-        catch (InterruptedException e)
-        {
-            Thread.currentThread().interrupt();
-            response.put("success", false);
-            response.put("errorType", "INTERRUPTED");
-            response.put("message", "Execução interrompida");
-            
-        }
-        catch (TimeoutException e)
-        {
-            response.put("success", false);
-            response.put("errorType", "TIMEOUT");
-            response.put("message", "Tempo limite excedido na operação");
-            
-        }
         catch (Exception e)
         {
-            response.put("success", false);
-            response.put("errorType", "UNEXPECTED_ERROR");
-            response.put("message", "Erro inesperado durante sincronização");
-            response.put("details", e.getClass().getSimpleName() + ": " + e.getMessage());
+            tratarErroSincronizacao(response, conexaoLocal, e);
             
         } finally
         {
@@ -183,13 +175,18 @@ public class SincronizacaoService
             }
         }
         
-        response.put("success", false);
-        response.put("errorType", e.getClass().getSimpleName());
-        response.put("message", "Erro durante sincronização");
-        response.put("details", e.getMessage());
-        
-        // System.out.println("Erro na sincronização "+e );
+        String errorType = e.getClass().getSimpleName();
+        String details = e.getMessage();
 
+        if( details.contains("does not exist"))
+        {
+            details = "A base informada não existe no servidor local.";
+        }
+
+        response.put("success", false);
+        response.put("error",errorType);
+        response.put("message", "Erro durante sincronização");
+        response.put("details", details);
     }
     
     private void finalizarConexoes(Connection conexaoCloud, Connection conexaoLocal)

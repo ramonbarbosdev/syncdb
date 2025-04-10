@@ -50,7 +50,8 @@ public class ConexaoBanco {
         }
         catch (SQLException e)
         {
-            System.err.println(e.getMessage() + " Base: " + database + ". Conexao: "+ tipo); 
+            // System.err.println(e.getMessage() + " Base: " + database + ". Conexao: "+ tipo); 
+            throw new SQLException(e.getMessage() + " Base: " + database + ". Conexao: "+ tipo);
         }
 
         return connection; 

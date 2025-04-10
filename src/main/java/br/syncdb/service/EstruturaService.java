@@ -40,7 +40,7 @@ public class EstruturaService {
     private QueryArquivoService queryArquivoService;
      
     
-    public void processarTabelas(Connection conexaoCloud,
+    public HashMap<String, List<String>>  processarTabelas(Connection conexaoCloud,
     Connection conexaoLocal,
     Set<String> tabelasCloud,
     Set<String> nomeTabelaLocal,
@@ -123,14 +123,12 @@ public class EstruturaService {
         queries.put("Chaves Estrangeiras",chavesEstrangeiras);
         queries.put("Alterações",alteracoes);
         // queries.put("Criação de Tabelas", funcoes);
-        
-        executarQueriesEmLotes(conexaoLocal, queries, detalhes);
-        
+        return queries;
         // queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
         // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
-    private void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries, List<EstruturaTabela> detalhes) {
+    public void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries, List<EstruturaTabela> detalhes) {
         for (Map.Entry<String, List<String>> entry : queries.entrySet())
         {
             String tipo = entry.getKey();

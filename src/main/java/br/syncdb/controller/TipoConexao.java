@@ -11,7 +11,8 @@ public enum TipoConexao
         this.prefixo = prefixo;
     }
 
-    public String getPrefixo() {
+    public String getPrefixo()
+    {
         return prefixo;
     }
 }
