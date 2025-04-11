@@ -35,8 +35,17 @@ public class WebConfigSecurity {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())  // Desabilita CSRF (necessário para APIs stateless)
             .authorizeHttpRequests(auth -> auth
-            		.requestMatchers(HttpMethod.OPTIONS,"/**", "/index", "/login").permitAll()   // Permite acesso público
-            	    .anyRequest().authenticated() 
+            		.requestMatchers(
+                        HttpMethod.OPTIONS,
+                        "/**",
+                        "/index",
+                        "/login",
+                        "/ws/**",
+                        "/syncdb/ws/**"
+                        )
+                        .permitAll()   // Permite acesso público
+                        .anyRequest()
+                        .authenticated() 
             )
             .logout(logout -> logout
                 .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))  // Define o caminho para logout

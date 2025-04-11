@@ -1,6 +1,7 @@
 package br.syncdb.security;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.Date;
 
 import org.apache.logging.log4j.util.Base64Util;
@@ -139,6 +140,40 @@ public class JWTTokenAutenticacaoService {
         liberacaoCors(response);
 
         // Não autorizado
+        return null;
+    }
+
+
+    public static Principal getPrincipalFromToken(String token) {
+        try {
+            SecretKeySpec secretKey = createSecretKey();
+            
+            String username = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+
+            if (username != null) {
+                Usuario usuario = ApplicationContextLoad.getApplicationContext()
+                    .getBean(UsuarioRepository.class)
+                    .findUserByLogin(username);
+
+                if (usuario != null && token.equalsIgnoreCase(usuario.getToken())) {
+                    return new Principal() {
+                        @Override
+                        public String getName() {
+                            return usuario.getLogin(); // ou outro identificador
+                        }
+                    };
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         return null;
     }
     
