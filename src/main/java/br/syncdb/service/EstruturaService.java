@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import br.syncdb.model.EstruturaTabela;
@@ -38,8 +39,10 @@ public class EstruturaService {
 
     @Autowired
     private QueryArquivoService queryArquivoService;
+
+    @Autowired
+    private ProcessoService processoService;
      
-    
     public HashMap<String, List<String>>  processarTabelas(Connection conexaoCloud,
     Connection conexaoLocal,
     Set<String> tabelasCloud,
@@ -50,8 +53,6 @@ public class EstruturaService {
     ) 
     throws SQLException
     {
-        //TO:DO - FAZER RETORNO 
-        //TO:DO - ACHAR A ORIGEM DO ERRO
         String pastaQueries = "src\\main\\java\\br\\syncdb\\query\\queries_"+base;
         File diretorio = new File(pastaQueries);
         
@@ -67,6 +68,11 @@ public class EstruturaService {
         List<String> alteracoes = Collections.synchronizedList(new ArrayList<>());
 
         String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal);
+
+        int totalTabelas = tabelasCloud.size();
+        AtomicInteger tabelasProcessadas = new AtomicInteger(0);
+
+        processoService.enviarProgresso("inicio", 0, "Iniciando processamento de " + totalTabelas + " tabelas", null);
         
         if (sequenciaQuery != null)
         {
@@ -75,11 +81,16 @@ public class EstruturaService {
     
         for (String itemTabela : tabelasCloud)
         {
+            int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
+            processoService.enviarProgresso("processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
+
             EstruturaTabela infoEstrutura = new EstruturaTabela();
             
             if (!nomeTabelaLocal.contains(itemTabela))
             {
                 System.out.println("Criando estrutura da tabela: " + itemTabela);
+
+                
                 
                 String createTable = databaseService.criarEstuturaTabela(conexaoCloud, itemTabela);
                 if (createTable != null)
@@ -115,6 +126,8 @@ public class EstruturaService {
                
             }
         }
+
+        processoService.enviarProgresso("conclusao", 100, "Processamento concluído com sucesso", null);
         
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();

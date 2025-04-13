@@ -31,6 +31,7 @@ import java.util.Map.Entry;
 
 import org.jooq.exception.DataAccessException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import br.syncdb.config.CacheManager;
@@ -54,6 +55,7 @@ public class SincronizacaoService
     
     @Autowired
     private OperacaoBancoService operacaoBancoService;
+
 
     private static final Map<String, Map<String, Object>> cache = new ConcurrentHashMap<>();
 

@@ -20,16 +20,28 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
             ServerHttpResponse response,
             WebSocketHandler wsHandler,
             Map<String, Object> attributes) throws Exception {
+                
+    
+        // if (request instanceof ServletServerHttpRequest servletRequest) {
 
-        if (request instanceof ServletServerHttpRequest servletRequest)
-        {
-            String token = servletRequest.getServletRequest().getParameter("Authorization");
-          
-            System.out.println("Token recebido no WebSocket: " + token);
-        }
+        //     String token = servletRequest.getServletRequest().getHeader("Authorization");
+        //     System.out.println(token);
+
+        //     if (token != null && token.startsWith("Bearer "))
+        //     {
+        //         token = token.substring(7); 
+                
+        //         System.out.println("Token recebido no WebSocket: " + token);
+        //     }
+        //     else
+        //     {
+        //         System.out.println("Token de autorização não encontrado ou formato inválido.");
+        //         return false; 
+        //     }
+        // }
         return true;
     }
-
+    
 
     @Override
     public void afterHandshake(
