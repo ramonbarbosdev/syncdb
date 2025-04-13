@@ -89,8 +89,6 @@ public class EstruturaService {
             if (!nomeTabelaLocal.contains(itemTabela))
             {
                 System.out.println("Criando estrutura da tabela: " + itemTabela);
-
-                
                 
                 String createTable = databaseService.criarEstuturaTabela(conexaoCloud, itemTabela);
                 if (createTable != null)

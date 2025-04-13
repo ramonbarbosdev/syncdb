@@ -16,7 +16,6 @@ public class ProcessoService {
     public ProcessoService(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
     }
-
     
     public void enviarProgresso(String status, int progresso, String mensagem, String tabelaAtual) {
         Map<String, Object> progressoMsg = new HashMap<>();
