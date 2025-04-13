@@ -72,7 +72,7 @@ public class EstruturaService {
         int totalTabelas = tabelasCloud.size();
         AtomicInteger tabelasProcessadas = new AtomicInteger(0);
 
-        processoService.enviarProgresso("inicio", 0, "Iniciando processamento de " + totalTabelas + " tabelas", null);
+        processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
         
         if (sequenciaQuery != null)
         {
@@ -82,7 +82,7 @@ public class EstruturaService {
         for (String itemTabela : tabelasCloud)
         {
             int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
-            processoService.enviarProgresso("processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
+            processoService.enviarProgresso("Processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
 
             EstruturaTabela infoEstrutura = new EstruturaTabela();
             
@@ -127,7 +127,7 @@ public class EstruturaService {
             }
         }
 
-        processoService.enviarProgresso("conclusao", 100, "Processamento concluído com sucesso", null);
+        processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
         
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
