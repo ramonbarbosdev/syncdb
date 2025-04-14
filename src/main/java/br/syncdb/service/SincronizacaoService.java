@@ -173,7 +173,7 @@ public class SincronizacaoService
                 return response;
             }
             
-            // estruturaService.executarQueriesEmLotes(conexaoLocal, queries, detalhes);
+            estruturaService.executarQueriesEmLotes(conexaoLocal, queries);
 
             response.put("success", true); 
             response.put("mensagem", "Estrutura Sincronizada.");

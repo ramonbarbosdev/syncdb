@@ -141,7 +141,10 @@ public class EstruturaService {
         // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
-    public void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries, List<EstruturaTabela> detalhes) {
+    public void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries) {
+        
+        List<EstruturaTabela> detalhes =  new ArrayList<>();
+        
         for (Map.Entry<String, List<String>> entry : queries.entrySet())
         {
             String tipo = entry.getKey();
