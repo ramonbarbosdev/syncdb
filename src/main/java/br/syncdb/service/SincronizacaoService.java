@@ -156,7 +156,6 @@ public class SincronizacaoService
     public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela)
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
-        List<EstruturaTabela> detalhes = new ArrayList<>();
         Connection conexaoCloud = null;
         Connection conexaoLocal = null; 
         try
@@ -176,7 +175,6 @@ public class SincronizacaoService
             
             // estruturaService.executarQueriesEmLotes(conexaoLocal, queries, detalhes);
 
-            // response.put("tabelas_afetadas", detalhes); 
             response.put("success", true); 
             response.put("mensagem", "Estrutura Sincronizada.");
             conexaoLocal.commit();
