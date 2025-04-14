@@ -158,7 +158,6 @@ public class JWTTokenAutenticacaoService {
         {
             for (Cookie cookie : request.getCookies())
             {
-                System.out.println("Cookie: " + cookie.getName() + " = " + cookie.getValue());
                 if ("access_token".equals(cookie.getName()))
                 {
                     return cookie.getValue();

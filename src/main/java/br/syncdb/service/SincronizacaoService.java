@@ -34,7 +34,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import br.syncdb.config.CacheManager;
+import com.github.benmanes.caffeine.cache.Cache;
+
 import br.syncdb.config.ConexaoBanco;
 import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
@@ -56,8 +57,8 @@ public class SincronizacaoService
     @Autowired
     private OperacaoBancoService operacaoBancoService;
 
-
-    private static final Map<String, Map<String, Object>> cache = new ConcurrentHashMap<>();
+    @Autowired
+    private EstruturaCacheService estruturaCacheService;
 
    
 
@@ -111,7 +112,7 @@ public class SincronizacaoService
     
     
 
-    public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela, boolean fl_verificacao)
+    public Map<String, Object> verificarEstrutura(String base, String nomeTabela)
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
         List<EstruturaTabela> detalhes = new ArrayList<>();
@@ -129,17 +130,9 @@ public class SincronizacaoService
             Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
 
             HashMap<String, List<String>> queries = estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
-            
-            if(fl_verificacao == false)
-            {
-                estruturaService.executarQueriesEmLotes(conexaoLocal, queries, detalhes);
-                response.put("fl_verificacao", fl_verificacao); 
-            }
-            else
-            {
-                response.put("fl_verificacao", fl_verificacao); 
-            }
 
+            estruturaCacheService.salvarCache(base + ":" + nomeTabela, queries);
+            
             response.put("tabelas_afetadas", detalhes); 
             response.put("success", true); 
             conexaoLocal.commit();
@@ -148,6 +141,49 @@ public class SincronizacaoService
         {
             tratarErroSincronizacao(response, conexaoLocal, e);
         
+        }
+        catch (Exception e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
+            
+        } finally
+        {
+            finalizarConexoes(conexaoCloud, conexaoLocal);
+        }
+
+        return response;
+    }
+    public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela)
+    {
+        Map<String, Object> response = new LinkedHashMap<>(); 
+        List<EstruturaTabela> detalhes = new ArrayList<>();
+        Connection conexaoCloud = null;
+        Connection conexaoLocal = null; 
+        try
+        {
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoLocal.setAutoCommit(false);
+
+            @SuppressWarnings("unchecked")
+            HashMap<String, List<String>> queries = estruturaCacheService.buscarCache(base + ":" + nomeTabela, HashMap.class);
+
+            if (queries == null)
+            {
+                response.put("success", false);
+                response.put("mensagem", "Nenhuma verificação foi feita previamente.");
+                return response;
+            }
+            
+            // estruturaService.executarQueriesEmLotes(conexaoLocal, queries, detalhes);
+
+            // response.put("tabelas_afetadas", detalhes); 
+            response.put("success", true); 
+            response.put("mensagem", "Estrutura Sincronizada.");
+            conexaoLocal.commit();
+        }
+        catch (SQLException e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
         }
         catch (Exception e)
         {

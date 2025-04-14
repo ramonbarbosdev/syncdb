@@ -29,6 +29,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+
 import br.syncdb.model.EstruturaTabela;
 
 @Service
@@ -42,7 +44,7 @@ public class EstruturaService {
 
     @Autowired
     private ProcessoService processoService;
-     
+
     public HashMap<String, List<String>>  processarTabelas(Connection conexaoCloud,
     Connection conexaoLocal,
     Set<String> tabelasCloud,

@@ -28,14 +28,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.UsuarioDTO;
-import br.syncdb.config.CacheManager;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
 import br.syncdb.service.DatabaseService;
 import br.syncdb.service.SincronizacaoService;
 
 @RestController 
-@RequestMapping(value = "/sincronizacao")
+@RequestMapping(value = "/estrutura")
 public class SincronizacaoController
 {
 
@@ -46,7 +45,7 @@ public class SincronizacaoController
 	@Autowired
 	private DatabaseService databaseService;
 	
-	@GetMapping(value = "/estrutura/bases/", produces = "application/json")
+	@GetMapping(value = "/bases/", produces = "application/json")
 	public ResponseEntity<?> obterEstruturas ( ) 
 	{
 		List<String> bases = databaseService.listarBases("w5i_tecnologia", TipoConexao.CLOUD);
@@ -59,10 +58,10 @@ public class SincronizacaoController
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"NÃO EXISTE BASES\"}");
 	}
 
-	@GetMapping(value = "/estrutura/verificar/{base}", produces = "application/json")
+	@GetMapping(value = "/verificar/{base}", produces = "application/json")
 	public ResponseEntity<?> verificarEstrutura ( @PathVariable (value = "base") String base ) 
 	{
-		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null, true);
+		Map<String, Object>  resultado = sincronizacaoService.verificarEstrutura(base,  null);
 
 		if ((Boolean) resultado.get("success"))
 		{
@@ -74,14 +73,12 @@ public class SincronizacaoController
 							   .body(resultado);
 		}
 
-
 	}
 	
-    @GetMapping(value = "/estrutura/{base}", produces = "application/json")
+    @GetMapping(value = "/{base}", produces = "application/json")
 	public ResponseEntity<?> sincronizacaoEstruturaTotal ( @PathVariable (value = "base") String base ) 
 	{
-	
-		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null, true);
+		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null);
 
 		if ((Boolean) resultado.get("success"))
 		{
@@ -89,17 +86,15 @@ public class SincronizacaoController
 		}
 		else
 		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(resultado);
 		}
 
-
 	}
-    @GetMapping(value = "/estrutura/{base}/{tabela}", produces = "application/json")
+    @GetMapping(value = "/{base}/{tabela}", produces = "application/json")
 	public ResponseEntity<?> sincronizacaoEstruturaIndividual ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
 	{
 	
-		Map<String, Object> resultado = sincronizacaoService.sincronizarEstrutura(base,  tabela, true);
+		Map<String, Object> resultado = sincronizacaoService.sincronizarEstrutura(base,  tabela);
 
 		if ((Boolean) resultado.get("success"))
 		{
@@ -151,12 +146,5 @@ public class SincronizacaoController
 
 	}
 	
-
-	// @GetMapping("/cache/stats")
-	// public Map<String, Object> getCacheStats()
-	// {
-	// 	return TabelaCache.getEstatisticasCache();
-	// }
-   
 
 }
