@@ -8,11 +8,16 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -24,12 +29,18 @@ import org.jooq.Record;
 import org.jooq.Result;
 import org.jooq.impl.SQLDataType;
 import org.jooq.util.postgres.PGobject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import br.syncdb.model.EstruturaTabela;
+import br.syncdb.model.TabelaDetalhe;
 
 @Service
 public class OperacaoBancoService
 {
-    
+
+    @Autowired
+    private ProcessoService processoService;
 
     public List<String> registroDesconhecido(Connection connection, String tabela, Long id, String pkColumn )
     {
@@ -74,24 +85,88 @@ public class OperacaoBancoService
         return queryList;
 
     }
-    
-    public void execultarQuerySQL(Connection conexao ,  Map<String,List<String>> querys) throws SQLException
-    {
-        if(querys.size() == 0) return;
-        
-        for (Map.Entry<String, List<String>> entry : querys.entrySet())
-        {
-            String tabelaPendente = entry.getKey();
-            List<String> scripts = entry.getValue();
 
-            for (String script : scripts) {
-                try (java.sql.Statement stmt = conexao.createStatement())
-                {
-                    stmt.executeUpdate(script);
+    public  void executarQueriesEmLotes(
+        Connection conexao,
+        HashMap<String, List<String>> queries,
+        List<Map<String, String>> detalhes
+    ) {
+        try {
+            conexao.setAutoCommit(false);
+
+            int totalTabelas = queries.size();
+            AtomicInteger tabelasProcessadas = new AtomicInteger(0);
+            processoService.enviarProgresso("Iniciando", 0, "Iniciando processamento de queries", null);
+
+            for (Map.Entry<String, List<String>> entry : queries.entrySet()) {
+                String tipo = entry.getKey();
+                List<String> lista = entry.getValue();
+
+                System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
+
+                for (String query : lista) {
+                    String tabela = extrairNomeTabelaDaQuery(query);
+                    int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
+                    processoService.enviarProgresso("Processando", progresso, "Processando da tabela: " + tabela, tabela);
+
+                    try (java.sql.Statement stmt = conexao.createStatement()) {
+                        stmt.execute(query);
+                        System.out.println("Executada com sucesso:\n" + query);
+                    } catch (SQLException e) {
+                        System.out.println("Executada com erro:\n" + query);
+                       
+                        Map<String, String> criarDetalhe = new LinkedHashMap<>();
+                        criarDetalhe.put("tabela", tabela);
+                        criarDetalhe.put("acao", "execute");
+                        criarDetalhe.put("erro", e.getMessage() + " | SQLState: " + e.getSQLState());
+                        detalhes.add(criarDetalhe);
+
+                        conexao.rollback();
+                    }
                 }
+            }
+
+            processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
+            conexao.commit();
+
+        } catch (SQLException e) {
+            System.err.println("🛑 Falha na transação geral: " + e.getMessage());
+            try {
+                conexao.rollback();
+            } catch (SQLException ex) {
+                System.err.println("Erro ao tentar rollback: " + ex.getMessage());
+            }
+        } finally {
+            try {
+                conexao.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("Erro ao reativar autoCommit: " + e.getMessage());
             }
         }
     }
+      public String extrairNomeTabelaDaQuery(String query) {
+        query = query.trim().toUpperCase();
+    
+        String patternCreate = "CREATE TABLE IF NOT EXISTS ([\\w\\.]+)";
+        String patternCreateSimple = "CREATE TABLE ([\\w\\.]+)";
+        String patternAlter = "ALTER TABLE ([\\w\\.]+)";
+        String patternForeign = "ALTER TABLE ONLY ([\\w\\.]+)";
+        String patternInsert = "INSERT INTO ([\\w\\.]+)";
+        
+        List<String> patterns = Arrays.asList(patternCreate, patternCreateSimple, patternAlter, patternForeign, patternInsert);
+    
+        for (String patternStr : patterns)
+        {
+            Pattern pattern = Pattern.compile(patternStr);
+            Matcher matcher = pattern.matcher(query);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+    
+        return "desconhecida"; // Caso não consiga identificar
+    }
+    
 
     public List<String> cargaInicialCompleta(Connection conexaoCloud, Connection conexaoLocal, String tabela) throws SQLException {
         // Map para armazenar as instruções SQL (cache)
@@ -317,5 +392,6 @@ public class OperacaoBancoService
             stmt.setObject(i, rs.getObject(i));
         }
     }
+
 
 }

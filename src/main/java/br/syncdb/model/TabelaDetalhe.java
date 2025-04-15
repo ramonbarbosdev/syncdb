@@ -23,6 +23,7 @@ public class TabelaDetalhe
     {
         return acao;
     }
+
     public void setLinhaInseridas(int linhaInseridas)
     {
         this.linhaInseridas = linhaInseridas;

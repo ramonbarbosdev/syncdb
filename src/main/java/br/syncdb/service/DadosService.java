@@ -387,17 +387,18 @@ public class DadosService
         return parametros;
     }
 
-    public  void obterDadosTabelasPendentesCriacao(Connection conexaoCloud, Connection conexaoLocal, String tabela, List<TabelaDetalhe> detalhes,   Map<String,List<String>> querys) throws SQLException
+    public  HashMap<String, List<String>>  obterDadosTabela(Connection conexaoCloud, Connection conexaoLocal, String tabela, List<TabelaDetalhe> detalhes) throws SQLException
     {
 
         Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
         List<String> tabelas = (List<String>) parametrosMap.get("ordemCarga");
 
+        //querys
+        List<String> criacaoAtualizacaoSeq = Collections.synchronizedList(new ArrayList<>());
+        List<String> criacaoDados = Collections.synchronizedList(new ArrayList<>());
+        List<String> atualizacaoDados = Collections.synchronizedList(new ArrayList<>());
 
-        if(tabelas.size() == 0)
-        {
-            throw new SQLException("Tabela "+tabela+" não encontrada.");
-        }
+        if(tabelas.size() == 0)  throw new SQLException("Tabela "+tabela+" não encontrada.");
         
         for(String itemTabela : tabelas)
         {        
@@ -406,20 +407,22 @@ public class DadosService
             if(parametros != null)
             {
                 TabelaDetalhe infoDetalhe = new TabelaDetalhe();
-                atualizarSequencias(conexaoLocal, itemTabela);
+
+                String querySeq= atualizarSequencias(conexaoLocal, itemTabela);
+                if (querySeq != null)  criacaoAtualizacaoSeq.add(querySeq);
 
                 if ((Boolean) parametros.get("novo"))
                 {
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
-                    List<String> script = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
+                    List<String> query = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
 
-                    if(script.size() > 0)
+                    if(query.size() > 0)
                     {
                         infoDetalhe.setTabela(itemTabela);
                         infoDetalhe.setAcao("Inserção");
-                        infoDetalhe.setLinhaInseridas(script.size());
+                        infoDetalhe.setLinhaInseridas(query.size());
                         detalhes.add(infoDetalhe);
-                        querys.put(itemTabela,script);
+                        criacaoDados.addAll(query);
                     }
                    
                 } 
@@ -428,15 +431,15 @@ public class DadosService
                   
                     System.out.println("Tabela '"+itemTabela+"' com atualizações de dados pendendes.");
                     String pkColumn =  obterNomeColunaPK(conexaoCloud, itemTabela);
-                    List<String> script = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);  
+                    List<String> query = verificarConsistenciaRegistros(conexaoLocal, conexaoCloud, itemTabela, pkColumn);  
 
-                    if(script.size() > 0)
+                    if(query.size() > 0)
                     {
                         infoDetalhe.setTabela(itemTabela);
                         infoDetalhe.setAcao("Atualização");
-                        infoDetalhe.setLinhaAtualizadas(script.size());
+                        infoDetalhe.setLinhaAtualizadas(query.size());
                         detalhes.add(infoDetalhe);
-                        querys.put(itemTabela,script);
+                        atualizacaoDados.addAll(query);
                     }
                 } 
                 else
@@ -445,10 +448,15 @@ public class DadosService
                 }
                 
             }
-            
+    
         }
 
-            
+        HashMap<String, List<String>> queries = new LinkedHashMap<>();
+        queries.put("Sequencia", criacaoAtualizacaoSeq);
+        queries.put("Criacao", criacaoDados);
+        queries.put("Atualizacao", atualizacaoDados);
+        
+        return queries;    
     }
   
 
@@ -562,30 +570,19 @@ public class DadosService
         }
     }
     
-    public void atualizarSequencias(Connection connection, String nomeTabela) throws SQLException
+    public String atualizarSequencias(Connection connection, String nomeTabela) throws SQLException
     {
         String pkColumn = obterNomeColunaPK(connection, nomeTabela);
         String seq = consultarSequenciasPorTabela(connection, nomeTabela);
 
-        if(seq == null) 
-        {
-            return ;
-        }
+        if(seq == null)   return "";
     
         String query = String.format(
             "SELECT setval('%s', " +
             "COALESCE((SELECT MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END) FROM %s), 1) +1, false);",
             seq, pkColumn, pkColumn, nomeTabela);
 
-        try (java.sql.Statement statement = connection.createStatement())
-        {
-            statement.execute(query);
-        }
-        catch (SQLException e)
-        {
-            System.err.println("Erro ao atualizar sequência para a tabela: " + nomeTabela);
-            e.printStackTrace();
-        }
+        return query;
     }
     
     

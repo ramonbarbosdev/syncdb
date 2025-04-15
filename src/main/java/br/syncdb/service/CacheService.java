@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import com.github.benmanes.caffeine.cache.Cache;
 
 @Service
-public class EstruturaCacheService
+public class CacheService
 {
     @Autowired
     private Cache<String, Object> estruturaCache;

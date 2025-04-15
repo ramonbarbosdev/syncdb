@@ -40,8 +40,6 @@ public class EstruturaService {
     @Autowired
     private DatabaseService databaseService;
 
-    @Autowired
-    private QueryArquivoService queryArquivoService;
 
     @Autowired
     private ProcessoService processoService;
@@ -137,89 +135,9 @@ public class EstruturaService {
         return queries;
     }
 
-    public void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries, List<EstruturaTabela> detalhes)
-    {
-        try {
-            conexao.setAutoCommit(false); 
-            
-            int totalTabelas = queries.size();
-            AtomicInteger tabelasProcessadas = new AtomicInteger(0);
-            processoService.enviarProgresso("Iniciando", 0, "Iniciando processamento de querys", null);
-
-            for (Map.Entry<String, List<String>> entry : queries.entrySet())
-            {
-                String tipo = entry.getKey();
-                List<String> lista = entry.getValue();
-                
-                System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
     
-                for (String query : lista)
-                {
-                    String tabela = extrairNomeTabelaDaQuery(query);
 
-                    int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
-                    processoService.enviarProgresso("Processando", progresso, "Processando da tabela: "+tabela, tabela);
-    
-                    try (Statement stmt = conexao.createStatement())
-                    {
-                        stmt.execute(query);
-                        System.out.println("Executada com sucesso:\n" + query);
-                    }
-                    catch (SQLException e) 
-                    {   
-                        System.out.println("Executada com erro:\n" + query);
-                        EstruturaTabela infoEstrutura = new EstruturaTabela();
-                        infoEstrutura.setTabela(tabela);
-                        infoEstrutura.setAcao("execute");
-                        infoEstrutura.setErro(e.getMessage() + " | SQLState: " + e.getSQLState());                        
-                        detalhes.add(infoEstrutura);
-                        conexao.rollback();
-                    }
-                }
-            }
-
-            processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
-
-            conexao.commit(); 
-
-        } catch (SQLException e) {
-            System.err.println("🛑 Falha na transação geral: " + e.getMessage());
-            try {
-                conexao.rollback();
-            } catch (SQLException ex) {
-                System.err.println("Erro ao tentar rollback: " + ex.getMessage());
-            }
-        } finally {
-            try {
-                conexao.setAutoCommit(true);
-            } catch (SQLException e) {
-                System.err.println("Erro ao reativar autoCommit: " + e.getMessage());
-            }
-        }
-    }
-
-    public String extrairNomeTabelaDaQuery(String query) {
-        query = query.trim().toUpperCase();
-    
-        String patternCreate = "CREATE TABLE IF NOT EXISTS ([\\w\\.]+)";
-        String patternCreateSimple = "CREATE TABLE ([\\w\\.]+)";
-        String patternAlter = "ALTER TABLE ([\\w\\.]+)";
-        String patternForeign = "ALTER TABLE ONLY ([\\w\\.]+)";
-        String patternInsert = "INSERT INTO ([\\w\\.]+)";
-        
-        List<String> patterns = Arrays.asList(patternCreate, patternCreateSimple, patternAlter, patternForeign, patternInsert);
-    
-        for (String patternStr : patterns)
-        {
-            Pattern pattern = Pattern.compile(patternStr);
-            Matcher matcher = pattern.matcher(query);
-            if (matcher.find()) {
-                return matcher.group(1);
-            }
-        }
-    
-        return "desconhecida"; // Caso não consiga identificar
-    }
+  
     
     
     
