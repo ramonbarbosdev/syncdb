@@ -175,21 +175,21 @@ public class DatabaseService
         return query;
     }   
    
-    public String criarEstuturaTabela(Connection conexao, String nomeTabelaCompleto) throws SQLException {
+    public String criarEstuturaTabela(Connection conexao, String nomeTabelaCompleto) throws SQLException
+    {
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
     
-        // Separar schema e nome da tabela
         String schema = "public";
         String nomeTabela = nomeTabelaCompleto;
     
-        if (nomeTabelaCompleto.contains(".")) {
+        if (nomeTabelaCompleto.contains("."))
+        {
             String[] partes = nomeTabelaCompleto.split("\\.");
             schema = partes[0];
             nomeTabela = partes[1];
         }
     
-        // Mapear colunas com nextval para reconstruir depois
         Map<String, String> serialColumns = new HashMap<>();
         try (PreparedStatement stmt = conexao.prepareStatement(
                 "SELECT column_name, column_default FROM information_schema.columns " +
@@ -199,7 +199,7 @@ public class DatabaseService
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
                 String colName = rs.getString("column_name");
-                String rawDefault = rs.getString("column_default"); // Ex: nextval('schema.seqname'::regclass)
+                String rawDefault = rs.getString("column_default"); 
                 String clean = rawDefault.replace("::regclass", "").replace("nextval(", "").replace("'", "").replace(")", "").trim();
                 String seqSemSchema = clean.contains(".") ? clean.split("\\.")[1] : clean;
                 String seqDef = "nextval('" + seqSemSchema + "'::regclass)";
@@ -258,7 +258,6 @@ public class DatabaseService
                         .append(String.join(", ", pkColumns))
                         .append(")\n");
             } else {
-                // remover última vírgula se não houver chave primária
                 createTableScript.setLength(createTableScript.length() - 2);
                 createTableScript.append("\n");
             }
@@ -294,8 +293,7 @@ public class DatabaseService
                         nomeSequenciaCloud);
                     createTableScript.append(createSequenceQuery+"\n");
                 }
-                
-
+            
             }
         }
 
