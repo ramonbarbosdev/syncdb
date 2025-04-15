@@ -128,8 +128,8 @@ public class EstruturaService {
         
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
-        queries.put("Sequências", sequencias);
         queries.put("Schemas", criacaoSchema);
+        queries.put("Sequências", sequencias);
         queries.put("Criação de Tabelas", criacoesTabela);
         queries.put("Chaves Estrangeiras",chavesEstrangeiras);
         queries.put("Alterações",alteracoes);
