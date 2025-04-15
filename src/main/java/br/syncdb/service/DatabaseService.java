@@ -146,125 +146,139 @@ public class DatabaseService
        
         return false; 
     }
-    public String criarEstuturaTabela(Connection conexao, String nomeTabela) throws SQLException
-    {
 
+    public String extrairSchema(String nomeTabela)
+    {
+        if (nomeTabela.contains("."))  return nomeTabela.split("\\.")[0];
+        return null; 
+    }
+
+    public boolean schemaExiste(Connection conexao, String nomeSchema) throws SQLException
+    {
+        String sql = "SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?";
+        try (PreparedStatement stmt = conexao.prepareStatement(sql))
+        {
+            stmt.setString(1, nomeSchema);
+            try (ResultSet rs = stmt.executeQuery())
+            {
+                return rs.next(); 
+            }
+        }
+    }
+
+    public String gerarQueryCriacaoSchemas(Connection conexao, String schema) throws SQLException
+    {
+        String query = "";
+
+        if (!schemaExiste(conexao, schema)) query = "CREATE SCHEMA IF NOT EXISTS " + schema + ";";
+    
+        return query;
+    }   
+   
+    public String criarEstuturaTabela(Connection conexao, String nomeTabelaCompleto) throws SQLException {
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
-        
+    
+        // Separar schema e nome da tabela
+        String schema = "public";
+        String nomeTabela = nomeTabelaCompleto;
+    
+        if (nomeTabelaCompleto.contains(".")) {
+            String[] partes = nomeTabelaCompleto.split("\\.");
+            schema = partes[0];
+            nomeTabela = partes[1];
+        }
+    
+        // Mapear colunas com nextval para reconstruir depois
         Map<String, String> serialColumns = new HashMap<>();
         try (PreparedStatement stmt = conexao.prepareStatement(
                 "SELECT column_name, column_default FROM information_schema.columns " +
-                "WHERE table_name = ? AND column_default LIKE 'nextval%'"))
-        {
-            stmt.setString(1, nomeTabela);
+                "WHERE table_schema = ? AND table_name = ? AND column_default LIKE 'nextval%'")) {
+            stmt.setString(1, schema);
+            stmt.setString(2, nomeTabela);
             ResultSet rs = stmt.executeQuery();
-            while (rs.next())
-            {
-                String colName = rs.getString(1);
-                String seqDef = rs.getString(2).replace("::regclass", "").trim();
+            while (rs.next()) {
+                String colName = rs.getString("column_name");
+                String rawDefault = rs.getString("column_default"); // Ex: nextval('schema.seqname'::regclass)
+                String clean = rawDefault.replace("::regclass", "").replace("nextval(", "").replace("'", "").replace(")", "").trim();
+                String seqSemSchema = clean.contains(".") ? clean.split("\\.")[1] : clean;
+                String seqDef = "nextval('" + seqSemSchema + "'::regclass)";
                 serialColumns.put(colName, seqDef);
             }
         }
     
-        // construir o script
-        createTableScript.append("CREATE TABLE ").append(nomeTabela).append(" (\n");
-        
+        // Construir a definição da tabela
+        createTableScript.append("CREATE TABLE ").append(schema).append(".").append(nomeTabela).append(" (\n");
+    
         DatabaseMetaData metaData = conexao.getMetaData();
-        try (ResultSet columns = metaData.getColumns(null, "public", nomeTabela, null))
-        {
-            while (columns.next())
-            {
+        try (ResultSet columns = metaData.getColumns(null, schema, nomeTabela, null)) {
+            while (columns.next()) {
                 String colName = columns.getString("COLUMN_NAME").trim();
                 String typeName = columns.getString("TYPE_NAME").trim();
                 boolean isNullable = "1".equals(columns.getString("NULLABLE"));
                 String defaultValue = columns.getString("COLUMN_DEF");
-                
+    
                 createTableScript.append("    ").append(colName).append(" ");
-                
-                //tratamento para colunas serial
-                if (serialColumns.containsKey(colName))
-                {
-                    if(typeName.contains("serial"))
-                    {
-                        createTableScript.append("integer"); 
-                    }
-                    else
-                    {
-                        createTableScript.append(typeName);
-                    }
-                }
-                else
-                {
+    
+                if (serialColumns.containsKey(colName)) {
+                    createTableScript.append("integer");
+                } else {
                     createTableScript.append(typeName);
                 }
-                
-                if (!isNullable)
-                {
+    
+                if (!isNullable) {
                     createTableScript.append(" NOT NULL");
                 }
-                
-                // Default values
-                if (serialColumns.containsKey(colName))
-                {
+    
+                if (serialColumns.containsKey(colName)) {
                     createTableScript.append(" DEFAULT ").append(serialColumns.get(colName));
-                }
-                else if (defaultValue != null && !defaultValue.isEmpty())
-                {
-                    if (defaultValue.toLowerCase().contains("uuid_generate_v4()"))
-                    {
+                } else if (defaultValue != null && !defaultValue.isEmpty()) {
+                    if (defaultValue.toLowerCase().contains("uuid_generate_v4()")) {
                         needsUuidOssp = true;
                         createTableScript.append(" DEFAULT uuid_generate_v4()");
-                    }
-                    else
-                    {
+                    } else {
                         String cleanDefault = defaultValue.split("::")[0].trim();
                         createTableScript.append(" DEFAULT ").append(cleanDefault);
                     }
                 }
-                
+    
                 createTableScript.append(",\n");
             }
         }
-        
-        // adicionar primary keys
-        try (ResultSet pkRs = metaData.getPrimaryKeys(null, "public", nomeTabela))
-        {
+    
+        // Adicionar chave primária
+        try (ResultSet pkRs = metaData.getPrimaryKeys(null, schema, nomeTabela)) {
             List<String> pkColumns = new ArrayList<>();
-            while (pkRs.next())
-            {
+            while (pkRs.next()) {
                 pkColumns.add(pkRs.getString("COLUMN_NAME"));
             }
-
-            if (!pkColumns.isEmpty())
-            {
+    
+            if (!pkColumns.isEmpty()) {
                 createTableScript.append("    PRIMARY KEY (")
-                               .append(String.join(", ", pkColumns))
-                               .append(")\n");
-            }
-            else
-            {
+                        .append(String.join(", ", pkColumns))
+                        .append(")\n");
+            } else {
+                // remover última vírgula se não houver chave primária
                 createTableScript.setLength(createTableScript.length() - 2);
                 createTableScript.append("\n");
             }
         }
-        
+    
         createTableScript.append(");");
-        
-        if (needsUuidOssp)
-        {
+    
+        if (needsUuidOssp) {
             createTableScript.insert(0, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n");
         }
-        
+    
         return createTableScript.toString();
     }
-
+    
 
     public  String  criarSequenciaQuery(Connection conexaoCloud, Connection conexaoLocal)  throws SQLException
     {
         StringBuilder createTableScript = new StringBuilder();
 
-        String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public';"; 
+        String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences "; 
         try (Statement stmtCloud = conexaoCloud.createStatement();
              ResultSet rsCloud = stmtCloud.executeQuery(querySequencias))
         {
@@ -440,10 +454,7 @@ public class DatabaseService
     {
         try
         {
-            if( conexao == null)
-            {
-                return null;
-            }
+            if( conexao == null) return null;
 
             DatabaseMetaData conexaoMetaData = conexao.getMetaData();
             ResultSet tabelas = conexaoMetaData.getTables(null, null, "%", new String[] {"TABLE"});
@@ -451,7 +462,10 @@ public class DatabaseService
             Set<String> nomeTabelas = new HashSet<>();
             while (tabelas.next())
             {
-                nomeTabelas.add(tabelas.getString("TABLE_NAME"));
+                String schema = tabelas.getString("TABLE_SCHEM");
+                String nomeTabela = tabelas.getString("TABLE_NAME");
+
+                nomeTabelas.add(schema + "." + nomeTabela);
             }
 
             return nomeTabelas;

@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,32 +56,22 @@ public class EstruturaService {
     ) 
     throws SQLException
     {
-        String pastaQueries = "src\\main\\java\\br\\syncdb\\query\\queries_"+base;
-        File diretorio = new File(pastaQueries);
-        
-        if (!diretorio.exists())
-        {
-            diretorio.mkdir();
-        }
-
+        List<String> criacaoSchema = Collections.synchronizedList(new ArrayList<>());
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
         List<String> funcoes = Collections.synchronizedList(new ArrayList<>());
         List<String> criacoesTabela = Collections.synchronizedList(new ArrayList<>());
         List<String> chavesEstrangeiras = Collections.synchronizedList(new ArrayList<>());
         List<String> alteracoes = Collections.synchronizedList(new ArrayList<>());
 
-        String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal);
-
         int totalTabelas = tabelasCloud.size();
         AtomicInteger tabelasProcessadas = new AtomicInteger(0);
+        Set<String> schemasCriados = new HashSet<>();
 
         processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
         
-        if (sequenciaQuery != null)
-        {
-            sequencias.add(sequenciaQuery);
-        }
-    
+        String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal);
+        if (sequenciaQuery != null)  sequencias.add(sequenciaQuery);
+
         for (String itemTabela : tabelasCloud)
         {
             int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
@@ -92,22 +83,28 @@ public class EstruturaService {
             {
                 System.out.println("Criando estrutura da tabela: " + itemTabela);
                 
-                String createTable = databaseService.criarEstuturaTabela(conexaoCloud, itemTabela);
-                if (createTable != null)
+                String schema = databaseService.extrairSchema(itemTabela); 
+                if (schema != null && !schemasCriados.contains(schema))
                 {
-                    criacoesTabela.add(createTable);
+                    String querySchema = databaseService.gerarQueryCriacaoSchemas(conexaoLocal, schema);
+                    if (querySchema != null && !querySchema.isBlank())
+                    {
+                        criacaoSchema.add(querySchema);
+                        schemasCriados.add(schema);
+                    }
+                }
+
+                String queryTabela = databaseService.criarEstuturaTabela(conexaoCloud, itemTabela);
+                if (queryTabela != null && !queryTabela.isBlank())
+                {
+                    criacoesTabela.add(queryTabela);
                     infoEstrutura.setTabela(itemTabela);
                     infoEstrutura.setAcao("create");
-                    // infoEstrutura.setQuerys(createTable.length());
                     detalhes.add(infoEstrutura);
                 }
                 
                 String fkQuery = databaseService.obterChaveEstrangeira(conexaoCloud, itemTabela);
-                if (fkQuery != null)
-                {
-                    chavesEstrangeiras.add(fkQuery);
-                }
-
+                if (fkQuery != null)  chavesEstrangeiras.add(fkQuery);
             }
             else
             {
@@ -132,50 +129,60 @@ public class EstruturaService {
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Sequências", sequencias);
+        queries.put("Schemas", criacaoSchema);
         queries.put("Criação de Tabelas", criacoesTabela);
         queries.put("Chaves Estrangeiras",chavesEstrangeiras);
         queries.put("Alterações",alteracoes);
-        // queries.put("Criação de Tabelas", funcoes);
+        
         return queries;
-        // queryArquivoService.salvarQueriesAgrupadas(diretorio, queries);
-        // response.put("pastaQueries", diretorio.getAbsolutePath());
     }
 
-    public void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries) {
-        
-        List<EstruturaTabela> detalhes =  new ArrayList<>();
-        
-        for (Map.Entry<String, List<String>> entry : queries.entrySet())
-        {
-            String tipo = entry.getKey();
-            List<String> lista = entry.getValue();
-          
-            
-            System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
+    public void executarQueriesEmLotes(Connection conexao, Map<String, List<String>> queries, List<EstruturaTabela> detalhes)
+    {
+        try {
+            conexao.setAutoCommit(false); 
     
-            for (String query : lista)
+            for (Map.Entry<String, List<String>> entry : queries.entrySet())
             {
-                String tabela = extrairNomeTabelaDaQuery(query);
-
-                try (Statement stmt = conexao.createStatement())
+                String tipo = entry.getKey();
+                List<String> lista = entry.getValue();
+                
+                System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
+    
+                for (String query : lista)
                 {
-                    stmt.execute(query);
-                    System.out.println("Executada com sucesso:\n" + query);
-                }
-                catch (SQLException e) 
-                {
-                    System.err.println("Erro ao executar query:\n" + query);
-                    System.err.println("Mensagem do erro: " + e.getMessage()+ "\n");
-
-                    for (EstruturaTabela detalhe : detalhes)
+                    String tabela = extrairNomeTabelaDaQuery(query);
+    
+                    try (Statement stmt = conexao.createStatement())
                     {
-                        if (detalhe.getTabela().equalsIgnoreCase(tabela))
-                        {
-                            detalhe.setErro(e.getMessage()); // Supondo que você tenha um campo 'erro' em EstruturaTabela
-                            break;
-                        }
+                        stmt.execute(query);
+                        System.out.println("✅ Executada com sucesso:\n" + query);
+                    }
+                    catch (SQLException e) 
+                    {   
+                        EstruturaTabela infoEstrutura = new EstruturaTabela();
+                        infoEstrutura.setTabela(tabela);
+                        infoEstrutura.setAcao("execute");
+                        infoEstrutura.setErro(e.getMessage() + " | SQLState: " + e.getSQLState());                        
+                        detalhes.add(infoEstrutura);
+                        conexao.rollback();
                     }
                 }
+            }
+    
+            conexao.commit(); 
+        } catch (SQLException e) {
+            System.err.println("🛑 Falha na transação geral: " + e.getMessage());
+            try {
+                conexao.rollback();
+            } catch (SQLException ex) {
+                System.err.println("Erro ao tentar rollback: " + ex.getMessage());
+            }
+        } finally {
+            try {
+                conexao.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("Erro ao reativar autoCommit: " + e.getMessage());
             }
         }
     }

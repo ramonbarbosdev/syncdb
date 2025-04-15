@@ -155,14 +155,13 @@ public class SincronizacaoService
     }
     public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela)
     {
-        Map<String, Object> response = new LinkedHashMap<>(); 
-        Connection conexaoCloud = null;
+        Map<String, Object> response = new LinkedHashMap<>();
+        List<EstruturaTabela> detalhes = new ArrayList<>();
+
         Connection conexaoLocal = null; 
         try
         {
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-            conexaoLocal.setAutoCommit(false);
-
             @SuppressWarnings("unchecked")
             HashMap<String, List<String>> queries = estruturaCacheService.buscarCache(base + ":" + nomeTabela, HashMap.class);
 
@@ -173,26 +172,19 @@ public class SincronizacaoService
                 return response;
             }
             
-            estruturaService.executarQueriesEmLotes(conexaoLocal, queries);
+            estruturaService.executarQueriesEmLotes(conexaoLocal, queries, detalhes);
 
             response.put("success", true); 
+            response.put("tabelas_afetadas", detalhes); 
             response.put("mensagem", "Estrutura Sincronizada.");
-            conexaoLocal.commit();
-        }
-        catch (SQLException e)
-        {
-            tratarErroSincronizacao(response, conexaoLocal, e);
+        
         }
         catch (Exception e)
         {
             tratarErroSincronizacao(response, conexaoLocal, e);
-            
-        } finally
-        {
-            finalizarConexoes(conexaoCloud, conexaoLocal);
         }
 
-        return response;
+        return response; 
     }
 
     
