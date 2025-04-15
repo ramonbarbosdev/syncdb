@@ -65,9 +65,9 @@ public class EstruturaService {
 
         int totalTabelas = tabelasCloud.size();
         AtomicInteger tabelasProcessadas = new AtomicInteger(0);
-        Set<String> schemasCriados = new HashSet<>();
-
         processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
+        
+        Set<String> schemasCriados = new HashSet<>();
         
         String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal);
         if (sequenciaQuery != null)  sequencias.add(sequenciaQuery);
@@ -141,7 +141,11 @@ public class EstruturaService {
     {
         try {
             conexao.setAutoCommit(false); 
-    
+            
+            int totalTabelas = queries.size();
+            AtomicInteger tabelasProcessadas = new AtomicInteger(0);
+            processoService.enviarProgresso("Iniciando", 0, "Iniciando processamento de querys", null);
+
             for (Map.Entry<String, List<String>> entry : queries.entrySet())
             {
                 String tipo = entry.getKey();
@@ -152,14 +156,18 @@ public class EstruturaService {
                 for (String query : lista)
                 {
                     String tabela = extrairNomeTabelaDaQuery(query);
+
+                    int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
+                    processoService.enviarProgresso("Processando", progresso, "Processando da tabela: "+tabela, tabela);
     
                     try (Statement stmt = conexao.createStatement())
                     {
                         stmt.execute(query);
-                        System.out.println("✅ Executada com sucesso:\n" + query);
+                        System.out.println("Executada com sucesso:\n" + query);
                     }
                     catch (SQLException e) 
                     {   
+                        System.out.println("Executada com erro:\n" + query);
                         EstruturaTabela infoEstrutura = new EstruturaTabela();
                         infoEstrutura.setTabela(tabela);
                         infoEstrutura.setAcao("execute");
@@ -169,8 +177,11 @@ public class EstruturaService {
                     }
                 }
             }
-    
+
+            processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
+
             conexao.commit(); 
+
         } catch (SQLException e) {
             System.err.println("🛑 Falha na transação geral: " + e.getMessage());
             try {
