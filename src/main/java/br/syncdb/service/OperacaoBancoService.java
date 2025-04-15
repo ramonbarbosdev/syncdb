@@ -172,11 +172,6 @@ public class OperacaoBancoService
         // Map para armazenar as instruções SQL (cache)
         List<String> sqlCache = new ArrayList<>();
 
-        if(tabela.equals("alteracao_orcamentaria"))
-        {
-            System.out.println(tabela);
-        }
-
         final int BATCH_SIZE = 1000;
         final int PAGE_SIZE = 50000;
         long offset = 0;

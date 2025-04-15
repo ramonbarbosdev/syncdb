@@ -162,10 +162,6 @@ public class SincronizacaoService
         {
             tratarErroSincronizacao(response, conexaoLocal, e);
         }
-        finally
-        {
-            finalizarConexoes(conexaoCloud, conexaoLocal);
-        }
 
         return response;
     }
@@ -208,11 +204,6 @@ public class SincronizacaoService
     {        
         String errorType = e.getClass().getSimpleName();
         String details = e.getMessage();
-
-        if( details.contains("does not exist"))
-        {
-            details = "A base informada não existe no servidor local.";
-        }
 
         response.put("success", false);
         response.put("error",errorType);

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 
@@ -44,7 +45,7 @@ public class DadosService
     private CicloService cicloService;
 
     @Autowired
-    private EstruturaService estruturaService;
+    private ProcessoService processoService;
 
     @Autowired
     private OperacaoBancoService operacaoBancoService;
@@ -52,6 +53,7 @@ public class DadosService
     
     public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
     {
+        //Está dando erro aqui por causa do schema
         if (nomeColuna == null || nomeColuna.isEmpty())
         {
             nomeColuna = obterNomeColunaPK(conexao, tabela);
@@ -398,10 +400,26 @@ public class DadosService
         List<String> criacaoDados = Collections.synchronizedList(new ArrayList<>());
         List<String> atualizacaoDados = Collections.synchronizedList(new ArrayList<>());
 
+        //Processamento
+        int totalTabelas = tabelas.size();
+        AtomicInteger tabelasProcessadas = new AtomicInteger(0);
+        processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
+        
+
         if(tabelas.size() == 0)  throw new SQLException("Tabela "+tabela+" não encontrada.");
         
         for(String itemTabela : tabelas)
-        {        
+        {    
+
+            if(itemTabela.contains("acervo"))
+            {
+                System.out.println(itemTabela);
+            }
+
+            //Processamento
+            int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
+            processoService.enviarProgresso("Processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
+
             Map<String, Object> parametros = definirParametrosVerificacao(conexaoCloud, conexaoLocal, itemTabela);
 
             if(parametros != null)
@@ -414,6 +432,7 @@ public class DadosService
                 if ((Boolean) parametros.get("novo"))
                 {
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
+                   
                     List<String> query = operacaoBancoService.cargaInicialCompleta( conexaoCloud,  conexaoLocal, itemTabela) ;
 
                     if(query.size() > 0)
@@ -450,6 +469,9 @@ public class DadosService
             }
     
         }
+       
+        //Processamento
+        processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Sequencia", criacaoAtualizacaoSeq);
@@ -594,7 +616,6 @@ public class DadosService
                        "FROM pg_sequences s " +
                        "JOIN pg_class c ON c.relname = s.sequencename " +
                        "JOIN pg_namespace n ON n.oid = c.relnamespace " +
-                       "WHERE n.nspname = 'public' " +
                        "AND s.sequencename LIKE '" + nomeTabela + "_%_seq';";
 
         try (java.sql.Statement statement = connection.createStatement();

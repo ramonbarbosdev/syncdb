@@ -40,7 +40,6 @@ public class EstruturaService {
     @Autowired
     private DatabaseService databaseService;
 
-
     @Autowired
     private ProcessoService processoService;
 
