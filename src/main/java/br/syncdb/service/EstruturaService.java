@@ -2,6 +2,8 @@ package br.syncdb.service;
 
 import java.io.File;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -186,7 +188,7 @@ public class EstruturaService {
                 {
                     criacoesTabela.add(queryTabela);
                     infoEstrutura.setTabela(itemTabela);
-                    infoEstrutura.setAcao("create");
+                    infoEstrutura.setAcao("Criação");
                     detalhes.add(infoEstrutura);
                 }
                 
@@ -203,7 +205,7 @@ public class EstruturaService {
                 {
                     alteracoes.add(alterQuery);
                     infoEstrutura.setTabela(itemTabela);
-                    infoEstrutura.setAcao("update");
+                    infoEstrutura.setAcao("Atualização");
                     // infoEstrutura.setQuerys(alterQuery.length());
                     detalhes.add(infoEstrutura);
                 }
@@ -223,7 +225,7 @@ public class EstruturaService {
         return queries;
     }
 
-    public  Set<String> obterTabelas(Connection conexao, String base, String nomeTabela) throws InterruptedException, ExecutionException, TimeoutException
+    public  Set<String> obterTabelas(Connection conexao, String base, String nomeTabela ) throws InterruptedException, ExecutionException, TimeoutException
     {
         CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync
         (() -> 
@@ -235,7 +237,7 @@ public class EstruturaService {
         if (nomeTabela != null && !nomeTabela.isBlank()) 
         {
             return tabelas.stream()
-                    .filter(t -> t.equalsIgnoreCase(nomeTabela))
+                    .filter(t -> t.contains(nomeTabela))
                     .collect(Collectors.toSet());
         }
     
@@ -251,5 +253,84 @@ public class EstruturaService {
             throw new SQLException("Estrutura da tabela " + tabela + " divergente entre cloud e local");
         }
     }
+
+    
+    public List<String> obterSchema(String base, TipoConexao  tipo) 
+    {
+        List<String> listar = new ArrayList<>();
+        if(base == null) return null;
+
+        try
+        {
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            String query = "select  distinct  table_schema FROM information_schema.tables where table_schema  not in  ('pg_catalog', 'information_schema')";
+            var stmt = conexao.createStatement();
+            var rs = stmt.executeQuery(query);
+        
+            while (rs.next())
+            {
+                String schema = rs.getString("table_schema");
+                listar.add(schema);
+            }
+
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+        }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
+        }
+            
+        return listar;
+    }
+    public List<String> obterBanco(String base, String esquema,  TipoConexao  tipo) 
+    {
+        List<String> listar = new ArrayList<>();
+        if(base == null) return null;
+
+        try
+        {
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            StringBuilder query = new StringBuilder(
+                "SELECT table_schema, table_name FROM information_schema.tables " +
+                "WHERE table_schema NOT IN ('pg_catalog', 'information_schema')"
+            );
+    
+            if (esquema != null && !esquema.isBlank()) {
+                query.append(" AND table_schema = ?");
+            }
+    
+            PreparedStatement stmt = conexao.prepareStatement(query.toString());
+
+            if (esquema != null && !esquema.isBlank()) {
+                stmt.setString(1, esquema);
+            }
+    
+
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                String schema = rs.getString("table_schema");
+                String nomeTabela = rs.getString("table_name");
+                listar.add(schema + "." + nomeTabela);
+            }
+
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+        }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
+        }
+            
+        return listar;
+    }
+
 
 }

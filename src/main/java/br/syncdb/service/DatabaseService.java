@@ -70,50 +70,6 @@ public class DatabaseService
         return bases;
     }
 
-    public List<String> obterBanco(String base, String banco, TipoConexao  tipo) 
-    {
-
-        List<String> databases = listarBases( base, tipo);
-        List<String> listarTabelas = new ArrayList<>();
-
-        if(databases == null)
-        {
-            return null;
-        }
-
-        try
-        {
-            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
-
-            for (String database : databases)
-            {
-                if(banco.trim().equalsIgnoreCase(database.trim()))
-                {
-                    String query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
-                    var stmt = conexao.createStatement();
-                    var rs = stmt.executeQuery(query);
-                
-                    while (rs.next())
-                    {
-                        String tableName = rs.getString("table_name");
-                        listarTabelas.add(tableName);
-                    }
-                }
-            }
-
-        }
-        catch (Exception e)
-        {
-            System.out.println(e.getMessage());
-        }
-        finally
-        {
-            ConexaoBanco.fecharConexao(base);
-        }
-            
-        return listarTabelas;
-    }
-
    
 
 
@@ -454,7 +410,7 @@ public class DatabaseService
             ResultSet tabelas = conexaoMetaData.getTables(null, null, "%", new String[] {"TABLE"});
             
             Set<String> nomeTabelas = new HashSet<>();
-            
+
             while (tabelas.next())
             {
                 String schema = tabelas.getString("TABLE_SCHEM");
