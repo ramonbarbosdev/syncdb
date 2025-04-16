@@ -32,6 +32,8 @@ import org.springframework.stereotype.Service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 
+import br.syncdb.config.ConexaoBanco;
+import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.EstruturaTabela;
 import br.syncdb.utils.UtilsSync;
 
@@ -47,13 +49,96 @@ public class EstruturaService {
     @Autowired
     private UtilsSync utilsSync;
 
+    @Autowired
+    private OperacaoBancoService operacaoBancoService;
+
+    @Autowired
+    private CacheService cacheService;
+
+    public Map<String, Object> verificarEstrutura(String base, String nomeTabela)
+    {
+        Map<String, Object> response = new LinkedHashMap<>(); 
+        List<EstruturaTabela> detalhes = new ArrayList<>();
+        
+        Connection conexaoCloud = null;
+        Connection conexaoLocal = null; 
+        try
+        {
+            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+
+            Set<String> tabelasLocal = obterTabelas(conexaoLocal, base, nomeTabela);
+            Set<String> tabelasCloud = obterTabelas(conexaoCloud, base, nomeTabela);
+
+            HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
+
+            cacheService.salvarCache(base + ":" + nomeTabela, queries);
+            
+            response.put("tabelas_afetadas", detalhes); 
+            response.put("sucesso", true); 
+        }
+        catch (Exception e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
+        }
+
+        return response;
+    }
+
+    public Map<String, Object> sincronizarEstrutura(String base)
+    {
+        Map<String, Object> response = new LinkedHashMap<>();
+        List<Map<String, String>> detalhes = new ArrayList<>();
+
+        Connection conexaoLocal = null; 
+        try
+        {
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            @SuppressWarnings("unchecked")
+            HashMap<String, List<String>> querys = cacheService.buscarCache(base + ":", HashMap.class);
+
+            if (querys == null)
+            {
+                response.put("sucesso", false);
+                response.put("mensagem", "Nenhuma verificação foi feita previamente.");
+                return response;
+            }
+            
+            operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
+
+            response.put("sucesso", true); 
+            response.put("tabelas_afetadas", detalhes); 
+            response.put("mensagem", "Estrutura Sincronizada.");
+        
+        }
+        catch (Exception e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
+        }
+
+        return response; 
+    }
+
+    
+    private void    tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)
+    {        
+        String errorType = e.getClass().getSimpleName();
+        String details = e.getMessage();
+
+        response.put("sucesso", false);
+        response.put("erro",errorType);
+        response.put("mensagem", "Erro durante sincronização");
+        response.put("detalhes", details);
+    }
+
+
     public HashMap<String, List<String>>  processarTabelas(Connection conexaoCloud,
     Connection conexaoLocal,
     Set<String> tabelasCloud,
     Set<String> nomeTabelaLocal,
     List<EstruturaTabela> detalhes,
     String base,
-    String nomeTabelaUni
+    String nomeTabela
     ) 
     throws SQLException
     {
@@ -75,6 +160,7 @@ public class EstruturaService {
 
         for (String itemTabela : tabelasCloud)
         {
+           
             int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
             processoService.enviarProgresso("Processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
 
@@ -126,7 +212,6 @@ public class EstruturaService {
         }
 
         processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
-        
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Schemas", criacaoSchema);
@@ -138,14 +223,7 @@ public class EstruturaService {
         return queries;
     }
 
-    
-
-  
-    
-    
-    
-
-    public  Set<String> obterTabelas(Connection conexao, String base) throws InterruptedException, ExecutionException, TimeoutException
+    public  Set<String> obterTabelas(Connection conexao, String base, String nomeTabela) throws InterruptedException, ExecutionException, TimeoutException
     {
         CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync
         (() -> 
@@ -153,6 +231,14 @@ public class EstruturaService {
         );
 
         Set<String> tabelas = futureCloud.get(5, TimeUnit.MINUTES);
+
+        if (nomeTabela != null && !nomeTabela.isBlank()) 
+        {
+            return tabelas.stream()
+                    .filter(t -> t.equalsIgnoreCase(nomeTabela))
+                    .collect(Collectors.toSet());
+        }
+    
 
         return tabelas;
     }

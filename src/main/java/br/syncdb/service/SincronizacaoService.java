@@ -46,9 +46,6 @@ import br.syncdb.model.TabelaDetalhe;
 public class SincronizacaoService
 {
     @Autowired
-    private DatabaseService databaseService;
-
-    @Autowired
     private EstruturaService estruturaService;
 
     @Autowired
@@ -135,69 +132,6 @@ public class SincronizacaoService
     }
     
     
-
-    public Map<String, Object> verificarEstrutura(String base, String nomeTabela)
-    {
-        Map<String, Object> response = new LinkedHashMap<>(); 
-        List<EstruturaTabela> detalhes = new ArrayList<>();
-        
-        Connection conexaoCloud = null;
-        Connection conexaoLocal = null; 
-        try
-        {
-            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-
-            Set<String> tabelasLocal = estruturaService.obterTabelas(conexaoLocal, base);
-            Set<String> tabelasCloud = estruturaService.obterTabelas(conexaoCloud, base);
-
-            HashMap<String, List<String>> queries = estruturaService.processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
-
-            cacheService.salvarCache(base + ":" + nomeTabela, queries);
-            
-            response.put("tabelas_afetadas", detalhes); 
-            response.put("sucesso", true); 
-        }
-        catch (Exception e)
-        {
-            tratarErroSincronizacao(response, conexaoLocal, e);
-        }
-
-        return response;
-    }
-    public Map<String, Object> sincronizarEstrutura(String base, String nomeTabela)
-    {
-        Map<String, Object> response = new LinkedHashMap<>();
-        List<Map<String, String>> detalhes = new ArrayList<>();
-
-        Connection conexaoLocal = null; 
-        try
-        {
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
-            @SuppressWarnings("unchecked")
-            HashMap<String, List<String>> querys = cacheService.buscarCache(base + ":" + nomeTabela, HashMap.class);
-
-            if (querys == null)
-            {
-                response.put("sucesso", false);
-                response.put("mensagem", "Nenhuma verificação foi feita previamente.");
-                return response;
-            }
-            
-            operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
-
-            response.put("sucesso", true); 
-            response.put("tabelas_afetadas", detalhes); 
-            response.put("mensagem", "Estrutura Sincronizada.");
-        
-        }
-        catch (Exception e)
-        {
-            tratarErroSincronizacao(response, conexaoLocal, e);
-        }
-
-        return response; 
-    }
 
     
     private void    tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)

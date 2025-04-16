@@ -454,6 +454,7 @@ public class DatabaseService
             ResultSet tabelas = conexaoMetaData.getTables(null, null, "%", new String[] {"TABLE"});
             
             Set<String> nomeTabelas = new HashSet<>();
+            
             while (tabelas.next())
             {
                 String schema = tabelas.getString("TABLE_SCHEM");
