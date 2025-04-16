@@ -70,6 +70,83 @@ public class DatabaseService
         return bases;
     }
 
+    
+    public List<String> obterSchema(String base, TipoConexao  tipo) 
+    {
+        List<String> listar = new ArrayList<>();
+        if(base == null) return null;
+
+        try
+        {
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            String query = "select  distinct  table_schema FROM information_schema.tables where table_schema  not in  ('pg_catalog', 'information_schema')";
+            var stmt = conexao.createStatement();
+            var rs = stmt.executeQuery(query);
+        
+            while (rs.next())
+            {
+                String schema = rs.getString("table_schema");
+                listar.add(schema);
+            }
+
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+        }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
+        }
+            
+        return listar;
+    }
+    public List<String> obterBanco(String base, String esquema,  TipoConexao  tipo) 
+    {
+        List<String> listar = new ArrayList<>();
+        if(base == null) return null;
+
+        try
+        {
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            StringBuilder query = new StringBuilder(
+                "SELECT table_schema, table_name FROM information_schema.tables " +
+                "WHERE table_schema NOT IN ('pg_catalog', 'information_schema')"
+            );
+    
+            if (esquema != null && !esquema.isBlank()) {
+                query.append(" AND table_schema = ?");
+            }
+    
+            PreparedStatement stmt = conexao.prepareStatement(query.toString());
+
+            if (esquema != null && !esquema.isBlank()) {
+                stmt.setString(1, esquema);
+            }
+    
+
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                String schema = rs.getString("table_schema");
+                String nomeTabela = rs.getString("table_name");
+                listar.add(schema + "." + nomeTabela);
+            }
+
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+        }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
+        }
+            
+        return listar;
+    }
    
 
 

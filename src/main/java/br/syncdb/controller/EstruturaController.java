@@ -43,7 +43,7 @@ public class EstruturaController {
 	@GetMapping(value = "/base/esquema/{base}", produces = "application/json")
 	public ResponseEntity<?> obterSchemaTabelaBase ( @PathVariable (value = "base") String base   ) 
 	{
-		List<String> esquema = estruturaService.obterSchema(base, TipoConexao.CLOUD);
+		List<String> esquema = databaseService.obterSchema(base, TipoConexao.CLOUD);
 
 		if(!esquema.isEmpty()) return ResponseEntity.ok(esquema);
 
@@ -52,7 +52,7 @@ public class EstruturaController {
 	@GetMapping(value = "/base/tabela/{base}/{esquema}", produces = "application/json")
 	public ResponseEntity<?> obterTabelaBase ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema     ) 
 	{
-		List<String> tabelas = estruturaService.obterBanco(base,esquema, TipoConexao.CLOUD);
+		List<String> tabelas = databaseService.obterBanco(base,esquema, TipoConexao.CLOUD);
 
 		if(!tabelas.isEmpty()) return ResponseEntity.ok(tabelas);
 

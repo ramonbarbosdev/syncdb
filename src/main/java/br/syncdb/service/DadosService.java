@@ -32,6 +32,8 @@ import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.syncdb.config.ConexaoBanco;
+import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.TabelaDetalhe;
 import br.syncdb.utils.UtilsSync;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -53,6 +55,95 @@ public class DadosService
 
     @Autowired
     private UtilsSync utilsSync;
+
+    @Autowired
+    private CacheService cacheService;
+
+
+
+     public Map<String, Object> verificarDados(String base, String tabela)
+    {
+        Connection conexaoCloud = null;
+        Connection conexaoLocal = null;
+        Map<String, Object> response = new HashMap<String, Object>();
+        List<TabelaDetalhe> detalhes = new ArrayList<>();
+       
+        try
+        {
+            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+
+            HashMap<String, List<String>> querys = obterDadosTabela(conexaoCloud,conexaoLocal, tabela, detalhes );
+
+            cacheService.salvarCache(base + ":" + tabela, querys);
+
+            response.put("sucesso", true); 
+            response.put("tabelas_afetadas", detalhes); 
+
+        }
+        catch (Exception e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
+        }
+        
+        return response;
+    }
+    public Map<String, Object> sincronizarDados(String base, String tabela, Boolean fl_verificacao)
+    {
+       
+        Connection conexaoLocal = null;
+        Map<String, Object> response = new HashMap<String, Object>();
+        List<Map<String, String>> detalhes = new ArrayList<>();
+       
+        try
+        {
+            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoLocal.setAutoCommit(false);
+
+            desativarConstraints(conexaoLocal);
+
+            @SuppressWarnings("unchecked")
+            HashMap<String, List<String>> querys = cacheService.buscarCache(base + ":" + tabela, HashMap.class);
+
+            if (querys == null)
+            {
+                response.put("sucesso", false);
+                response.put("mensagem", "Nenhuma verificação foi feita previamente.");
+                return response;
+            }
+            
+            operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
+            
+            response.put("sucesso", true); 
+            response.put("mensagem", "Sincronização de dados concluida"); 
+            response.put("tabelas_afetadas", detalhes); 
+
+            ativarConstraints(conexaoLocal);
+
+        }
+        catch (Exception e)
+        {
+            tratarErroSincronizacao(response, conexaoLocal, e);
+        }
+        finally
+        {
+            ConexaoBanco.fecharTodos();
+        }
+        
+        return response;
+    }
+
+    
+    private void    tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)
+    {        
+        String errorType = e.getClass().getSimpleName();
+        String details = e.getMessage();
+
+        response.put("sucesso", false);
+        response.put("erro",errorType);
+        response.put("mensagem", "Erro durante sincronização");
+        response.put("detalhes", details);
+    }
     
     
     public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
@@ -309,20 +400,26 @@ public class DadosService
         }
     }
 
-    public List<String> filtrarTabelasRelevantes(String tabela, List<String> ordemCarga, 
+    public List<String> filtrarTabelasRelevantes(String filtroParcial, List<String> ordemCarga,
     Map<String, Set<String>> dependencias)
     {
+
         Set<String> tabelasRelevantes = new LinkedHashSet<>();
         Set<String> visitado = new HashSet<>();
         Set<String> ciclo = new HashSet<>();
 
-        buscarDependencias(tabela, dependencias, tabelasRelevantes, visitado, ciclo);
+        for (String tabela : dependencias.keySet())
+        {
+            if (tabela.toLowerCase().contains(filtroParcial.toLowerCase()))
+            {
+                buscarDependencias(tabela, dependencias, tabelasRelevantes, visitado, ciclo);
+            }
+        }
 
         return ordemCarga.stream()
                         .filter(tabelasRelevantes::contains)
                         .collect(Collectors.toList());
-
-        }
+    }
 
     private void buscarDependencias(String tabela, Map<String, Set<String>> dependencias, 
     Set<String> tabelasRelevantes, Set<String> visitado, Set<String> ciclo)
