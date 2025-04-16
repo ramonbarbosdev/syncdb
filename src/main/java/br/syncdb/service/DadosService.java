@@ -75,9 +75,10 @@ public class DadosService
 
             HashMap<String, List<String>> querys = obterDadosTabela(conexaoCloud,conexaoLocal, tabela, detalhes );
 
-            cacheService.salvarCache(base + ":" + tabela, querys);
+            cacheService.salvarCache(base + "_dados:", querys);
 
             response.put("sucesso", true); 
+            response.put("mensagem", "Dados Sincronizado.");
             response.put("tabelas_afetadas", detalhes); 
 
         }
@@ -103,7 +104,7 @@ public class DadosService
             desativarConstraints(conexaoLocal);
 
             @SuppressWarnings("unchecked")
-            HashMap<String, List<String>> querys = cacheService.buscarCache(base + ":" + tabela, HashMap.class);
+            HashMap<String, List<String>> querys = cacheService.buscarCache(base + "_dados:", HashMap.class);
 
             if (querys == null)
             {
@@ -400,25 +401,19 @@ public class DadosService
         }
     }
 
-    public List<String> filtrarTabelasRelevantes(String filtroParcial, List<String> ordemCarga,
+    public List<String> filtrarTabelasRelevantes(String tabela, List<String> ordemCarga, 
     Map<String, Set<String>> dependencias)
     {
-
         Set<String> tabelasRelevantes = new LinkedHashSet<>();
         Set<String> visitado = new HashSet<>();
         Set<String> ciclo = new HashSet<>();
 
-        for (String tabela : dependencias.keySet())
-        {
-            if (tabela.toLowerCase().contains(filtroParcial.toLowerCase()))
-            {
-                buscarDependencias(tabela, dependencias, tabelasRelevantes, visitado, ciclo);
-            }
-        }
+        buscarDependencias(tabela, dependencias, tabelasRelevantes, visitado, ciclo);
 
         return ordemCarga.stream()
                         .filter(tabelasRelevantes::contains)
                         .collect(Collectors.toList());
+
     }
 
     private void buscarDependencias(String tabela, Map<String, Set<String>> dependencias, 
@@ -516,15 +511,10 @@ public class DadosService
         processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
         
 
-        if(tabelas.size() == 0)  throw new SQLException("Tabela "+tabela+" não encontrada.");
+        // if(tabelas.size() == 0)  throw new SQLException("Tabela "+tabela+" não encontrada.");
         
         for(String itemTabela : tabelas)
         {    
-
-            if(itemTabela.contains("public.produto_servico"))
-            {
-                System.out.println(itemTabela);
-            }
 
             //Processamento
             int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);

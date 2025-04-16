@@ -74,7 +74,7 @@ public class EstruturaService {
 
             HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
 
-            cacheService.salvarCache(base + ":" + nomeTabela, queries);
+            cacheService.salvarCache(base + "_estrutura:", queries);
             
             response.put("tabelas_afetadas", detalhes); 
             response.put("sucesso", true); 
@@ -97,7 +97,7 @@ public class EstruturaService {
         {
             conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
             @SuppressWarnings("unchecked")
-            HashMap<String, List<String>> querys = cacheService.buscarCache(base + ":", HashMap.class);
+            HashMap<String, List<String>> querys = cacheService.buscarCache(base + "_estrutura:", HashMap.class);
 
             if (querys == null)
             {
