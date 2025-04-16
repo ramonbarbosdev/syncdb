@@ -401,20 +401,39 @@ public class DadosService
         }
     }
 
-    public List<String> filtrarTabelasRelevantes(String tabela, List<String> ordemCarga, 
+    public List<String> filtrarTabelasRelevantes(String filtroParcial, List<String> ordemCarga,
     Map<String, Set<String>> dependencias)
     {
+
         Set<String> tabelasRelevantes = new LinkedHashSet<>();
         Set<String> visitado = new HashSet<>();
         Set<String> ciclo = new HashSet<>();
 
-        buscarDependencias(tabela, dependencias, tabelasRelevantes, visitado, ciclo);
+        if (!filtroParcial.contains("."))
+        {
+            List<String> tabelasDoEsquema = dependencias.keySet().stream()
+            .filter(t -> t.toLowerCase().startsWith(filtroParcial.toLowerCase() + "."))
+            .toList();
+
+            for (String tabela : tabelasDoEsquema)
+            {
+                buscarDependencias(tabela, dependencias, tabelasRelevantes, visitado, ciclo);
+            }
+        }
+        else
+        {
+            Optional<String> tabelaCorrespondente = dependencias.keySet().stream()
+            .filter(t -> t.toLowerCase().contains(filtroParcial.toLowerCase()))
+            .findFirst();
+
+            tabelaCorrespondente.ifPresent(t -> buscarDependencias(t, dependencias, tabelasRelevantes, visitado, ciclo));
+        }
 
         return ordemCarga.stream()
                         .filter(tabelasRelevantes::contains)
                         .collect(Collectors.toList());
-
     }
+
 
     private void buscarDependencias(String tabela, Map<String, Set<String>> dependencias, 
     Set<String> tabelasRelevantes, Set<String> visitado, Set<String> ciclo)
