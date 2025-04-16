@@ -5,7 +5,7 @@ public class EstruturaTabela
     private String tabela;
     private String acao;
     private String erro;
-    private int querys;
+    private String querys;
 
     public void setTabela(String tabela)
     {
@@ -31,11 +31,11 @@ public class EstruturaTabela
     {
         return erro;
     }
-    public void setQuerys(int querys)
+    public void setQuerys(String querys)
     {
         this.querys = querys;
     }
-    public int getQuerys()
+    public String getQuerys()
     {
         return querys;
     }

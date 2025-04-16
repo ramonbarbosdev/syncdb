@@ -6,6 +6,7 @@ public class TabelaDetalhe
     private String acao;
     private int linhaInseridas;
     private int linhaAtualizadas;
+    private String querys;
 
     public void setTabela(String tabela)
     {
@@ -39,6 +40,14 @@ public class TabelaDetalhe
     public int getLinhaAtualizadas()
     {
         return linhaAtualizadas;
+    }
+    public void setQuerys(String querys)
+    {
+        this.querys = querys;
+    }
+    public String getQuerys()
+    {
+        return querys;
     }
     
 }

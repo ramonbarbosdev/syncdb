@@ -78,7 +78,6 @@ public class DadosService
             cacheService.salvarCache(base + "_dados:", querys);
 
             response.put("sucesso", true); 
-            response.put("mensagem", "Dados Sincronizado.");
             response.put("tabelas_afetadas", detalhes); 
 
         }
@@ -529,7 +528,6 @@ public class DadosService
         AtomicInteger tabelasProcessadas = new AtomicInteger(0);
         processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
         
-
         // if(tabelas.size() == 0)  throw new SQLException("Tabela "+tabela+" não encontrada.");
         
         for(String itemTabela : tabelas)
@@ -546,7 +544,15 @@ public class DadosService
                 TabelaDetalhe infoDetalhe = new TabelaDetalhe();
 
                 String querySeq= atualizarSequencias(conexaoLocal, itemTabela);
-                if (querySeq != null)  criacaoAtualizacaoSeq.add(querySeq);
+                if (querySeq != null) 
+                {
+                    infoDetalhe.setTabela(itemTabela);
+                    infoDetalhe.setAcao("Atualização Sequencia");
+                    infoDetalhe.setLinhaInseridas(1);
+                    infoDetalhe.setQuerys(querySeq);
+                    detalhes.add(infoDetalhe);
+                    criacaoAtualizacaoSeq.add(querySeq);
+                }
 
                 if ((Boolean) parametros.get("novo"))
                 {
@@ -727,23 +733,40 @@ public class DadosService
     }
     
     
-    public  String consultarSequenciasPorTabela(Connection connection, String nomeTabela)
+    public  String consultarSequenciasPorTabela(Connection conexao, String nomeTabela)
     {
         String seq = null;
 
-        String query = "SELECT s.sequencename " +
-                       "FROM pg_sequences s " +
-                       "JOIN pg_class c ON c.relname = s.sequencename " +
-                       "JOIN pg_namespace n ON n.oid = c.relnamespace " +
-                       "AND s.sequencename LIKE '" + nomeTabela + "_%_seq';";
+        String tabela = utilsSync.extrairTabela(nomeTabela);
+        String schema = utilsSync.extrairSchema(nomeTabela);
 
-        try (java.sql.Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(query))
+        try 
         {
 
-            while (resultSet.next())
+            String query = "select " +
+                            "t.table_schema, " +
+                            "t.table_name, " +
+                            "c.column_name, " +
+                            "c.column_default, " +
+                            "s.schemaname AS sequence_schema, " +
+                            "s.sequencename AS sequence_name, " +
+                            "s.last_value " +
+                        "from information_schema.columns c " +
+                        "join information_schema.tables t ON t.table_name = c.table_name AND t.table_schema = c.table_schema " +
+                        "join pg_sequences s on c.column_default like '%nextval(''' || s.sequencename || '''%' " +
+                        "where t.table_name = ? " +
+                        "and t.table_schema = ? ;";
+
+            PreparedStatement stmt = conexao.prepareStatement(query.toString());
+
+            stmt.setString(1, tabela);
+            stmt.setString(2, schema);
+
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next())
             {
-                String sequenceName = resultSet.getString("sequencename");
+                String sequenceName = rs.getString("sequence_name");
       
                 seq = sequenceName;
                 
