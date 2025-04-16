@@ -543,17 +543,6 @@ public class DadosService
             {
                 TabelaDetalhe infoDetalhe = new TabelaDetalhe();
 
-                String querySeq= atualizarSequencias(conexaoLocal, itemTabela);
-                if (querySeq != null) 
-                {
-                    infoDetalhe.setTabela(itemTabela);
-                    infoDetalhe.setAcao("Atualização Sequencia");
-                    infoDetalhe.setLinhaInseridas(1);
-                    infoDetalhe.setQuerys(querySeq);
-                    detalhes.add(infoDetalhe);
-                    criacaoAtualizacaoSeq.add(querySeq);
-                }
-
                 if ((Boolean) parametros.get("novo"))
                 {
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
@@ -567,6 +556,17 @@ public class DadosService
                         infoDetalhe.setLinhaInseridas(query.size());
                         detalhes.add(infoDetalhe);
                         criacaoDados.addAll(query);
+                    }
+
+                    String querySeq= atualizarSequencias(conexaoLocal, itemTabela);
+                    if (querySeq != null) 
+                    {
+                        infoDetalhe.setTabela(itemTabela);
+                        infoDetalhe.setAcao("Atualização Sequencia");
+                        infoDetalhe.setLinhaInseridas(1);
+                        infoDetalhe.setQuerys(querySeq);
+                        detalhes.add(infoDetalhe);
+                        criacaoAtualizacaoSeq.add(querySeq);
                     }
                    
                 } 
