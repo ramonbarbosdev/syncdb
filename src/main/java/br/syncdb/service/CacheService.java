@@ -19,7 +19,8 @@ public class CacheService
     public <T> T buscarCache(String chave, Class<T> clazz)
     {
         Object valor = estruturaCache.getIfPresent(chave);
-        if (clazz.isInstance(valor)) {
+        if (clazz.isInstance(valor))
+        {
             return clazz.cast(valor);
         }
         return null;

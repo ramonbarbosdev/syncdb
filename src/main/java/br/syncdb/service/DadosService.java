@@ -33,6 +33,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import br.syncdb.model.TabelaDetalhe;
+import br.syncdb.utils.UtilsSync;
 import jakarta.persistence.criteria.CriteriaBuilder;
 
 @Service
@@ -49,11 +50,13 @@ public class DadosService
 
     @Autowired
     private OperacaoBancoService operacaoBancoService;
+
+    @Autowired
+    private UtilsSync utilsSync;
     
     
     public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
     {
-        //Está dando erro aqui por causa do schema
         if (nomeColuna == null || nomeColuna.isEmpty())
         {
             nomeColuna = obterNomeColunaPK(conexao, tabela);
@@ -63,11 +66,13 @@ public class DadosService
             }
         }
 
+        String tabelaSemSchema = utilsSync.extrairTabela(tabela);
+
         String sqlCheck = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = ?)";
 
         try (PreparedStatement stmtCheck = conexao.prepareStatement(sqlCheck))
         {
-            stmtCheck.setString(1, tabela);
+            stmtCheck.setString(1, tabelaSemSchema);
             try (ResultSet rsCheck = stmtCheck.executeQuery())
             {
                 if (rsCheck.next() && !rsCheck.getBoolean(1))
@@ -76,7 +81,7 @@ public class DadosService
                 }
             }
         }
-    
+        
         String sql = String.format(
             "SELECT COALESCE(MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END), 0) FROM %s", 
             nomeColuna, nomeColuna, tabela);
@@ -96,7 +101,10 @@ public class DadosService
 
     public String obterNomeColunaPK(Connection conexao, String tabela) throws SQLException
     {
-        try (ResultSet rs = conexao.getMetaData().getPrimaryKeys(null, null, tabela))
+        String schema = utilsSync.extrairSchema(tabela); 
+        String nomeTabela = utilsSync.extrairTabela(tabela); 
+
+        try (ResultSet rs = conexao.getMetaData().getPrimaryKeys(null, schema, nomeTabela))
         {
             if (rs.next()) {
                 return rs.getString("COLUMN_NAME");
@@ -117,29 +125,36 @@ public class DadosService
 
     
 
-    public Map<String, Set<String>> obterDependenciasTabelas(Connection conexao) throws SQLException
-    {
+    public Map<String, Set<String>> obterDependenciasTabelas(Connection conexao) throws SQLException {
         Map<String, Set<String>> dependencias = new HashMap<>();
         DatabaseMetaData meta = conexao.getMetaData();
-        
-      
-        try (ResultSet tabelas = meta.getTables(null, null, "%", new String[]{"TABLE"}))
-        {
+    
+        // Mapeia todas as tabelas com schema
+        try (ResultSet tabelas = meta.getTables(null, null, "%", new String[]{"TABLE"})) {
             while (tabelas.next()) {
+                String schema = tabelas.getString("TABLE_SCHEM");
                 String nomeTabela = tabelas.getString("TABLE_NAME");
-                dependencias.putIfAbsent(nomeTabela, new HashSet<>());
+                String chave = schema + "." + nomeTabela;
+                dependencias.putIfAbsent(chave, new HashSet<>());
             }
         }
-        
-        try (ResultSet fks = meta.getImportedKeys(conexao.getCatalog(), null, null))
-        {
+    
+        // Mapeia as dependências (FK -> PK)
+        try (ResultSet fks = meta.getImportedKeys(conexao.getCatalog(), null, null)) {
             while (fks.next()) {
+                String schemaFilha = fks.getString("FKTABLE_SCHEM");
                 String tabelaFilha = fks.getString("FKTABLE_NAME");
+    
+                String schemaPai = fks.getString("PKTABLE_SCHEM");
                 String tabelaPai = fks.getString("PKTABLE_NAME");
-                dependencias.computeIfAbsent(tabelaFilha, k -> new HashSet<>()).add(tabelaPai);
+    
+                String chaveFilha = schemaFilha + "." + tabelaFilha;
+                String chavePai = schemaPai + "." + tabelaPai;
+    
+                dependencias.computeIfAbsent(chaveFilha, k -> new HashSet<>()).add(chavePai);
             }
         }
-        
+    
         return dependencias;
     }
 
@@ -168,7 +183,6 @@ public class DadosService
     {
         System.out.println("Iniciando verificação de dados...");
 
-        Map<String, Object> response = new LinkedHashMap<>(); 
         Map<String, Object> parametrosMap = new HashMap<String, Object>();
 
         Map<String, Set<String>> dependencias = obterDependenciasTabelas(conexaoCloud);
@@ -180,7 +194,6 @@ public class DadosService
             ordemCarga = filtrarTabelasRelevantes(tabela, ordemCarga, dependencias);
         }
 
-        parametrosMap.put("response", response);
         parametrosMap.put("ordemCarga", ordemCarga);
 
         return parametrosMap;
@@ -411,7 +424,7 @@ public class DadosService
         for(String itemTabela : tabelas)
         {    
 
-            if(itemTabela.contains("acervo"))
+            if(itemTabela.contains("public.produto_servico"))
             {
                 System.out.println(itemTabela);
             }

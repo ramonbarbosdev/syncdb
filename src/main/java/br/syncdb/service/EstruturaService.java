@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import com.github.benmanes.caffeine.cache.Cache;
 
 import br.syncdb.model.EstruturaTabela;
+import br.syncdb.utils.UtilsSync;
 
 @Service
 public class EstruturaService {
@@ -42,6 +43,9 @@ public class EstruturaService {
 
     @Autowired
     private ProcessoService processoService;
+
+    @Autowired
+    private UtilsSync utilsSync;
 
     public HashMap<String, List<String>>  processarTabelas(Connection conexaoCloud,
     Connection conexaoLocal,
@@ -80,7 +84,7 @@ public class EstruturaService {
             {
                 System.out.println("Criando estrutura da tabela: " + itemTabela);
                 
-                String schema = databaseService.extrairSchema(itemTabela); 
+                String schema = utilsSync.extrairSchema(itemTabela); 
                 if (schema != null && !schemasCriados.contains(schema))
                 {
                     String querySchema = databaseService.gerarQueryCriacaoSchemas(conexaoLocal, schema);

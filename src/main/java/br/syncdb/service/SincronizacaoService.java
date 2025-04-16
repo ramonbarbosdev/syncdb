@@ -77,7 +77,7 @@ public class SincronizacaoService
 
             cacheService.salvarCache(base + ":" + tabela, querys);
 
-            response.put("success", true); 
+            response.put("sucesso", true); 
             response.put("mensagem", "Dados Sincronizado.");
             response.put("tabelas_afetadas", detalhes); 
 
@@ -108,15 +108,15 @@ public class SincronizacaoService
 
             if (querys == null)
             {
-                response.put("success", false);
+                response.put("sucesso", false);
                 response.put("mensagem", "Nenhuma verificação foi feita previamente.");
                 return response;
             }
             
             operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
             
-            response.put("success", true); 
-            response.put("message", "Sincronização de dados concluida"); 
+            response.put("sucesso", true); 
+            response.put("mensagem", "Sincronização de dados concluida"); 
             response.put("tabelas_afetadas", detalhes); 
 
             dadosService.ativarConstraints(conexaoLocal);
@@ -156,7 +156,7 @@ public class SincronizacaoService
             cacheService.salvarCache(base + ":" + nomeTabela, queries);
             
             response.put("tabelas_afetadas", detalhes); 
-            response.put("success", true); 
+            response.put("sucesso", true); 
         }
         catch (Exception e)
         {
@@ -179,14 +179,14 @@ public class SincronizacaoService
 
             if (querys == null)
             {
-                response.put("success", false);
+                response.put("sucesso", false);
                 response.put("mensagem", "Nenhuma verificação foi feita previamente.");
                 return response;
             }
             
             operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
 
-            response.put("success", true); 
+            response.put("sucesso", true); 
             response.put("tabelas_afetadas", detalhes); 
             response.put("mensagem", "Estrutura Sincronizada.");
         
@@ -205,10 +205,10 @@ public class SincronizacaoService
         String errorType = e.getClass().getSimpleName();
         String details = e.getMessage();
 
-        response.put("success", false);
-        response.put("error",errorType);
-        response.put("message", "Erro durante sincronização");
-        response.put("details", details);
+        response.put("sucesso", false);
+        response.put("erro",errorType);
+        response.put("mensagem", "Erro durante sincronização");
+        response.put("detalhes", details);
     }
     
     private void finalizarConexoes(Connection conexaoCloud, Connection conexaoLocal)

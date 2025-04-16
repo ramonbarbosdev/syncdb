@@ -54,7 +54,7 @@ public class DadosController
 			return ResponseEntity.ok(bases);
 		}
 
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"NÃO EXISTE BASES\"}");
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Base informada não existe\"}");
 	}
 
 	@GetMapping(value = "/verificar/{base}", produces = "application/json")
@@ -62,7 +62,7 @@ public class DadosController
 	{
 		Map<String, Object>  resultado = sincronizacaoService.verificarDados(base,  null);
 
-		if ((Boolean) resultado.get("success"))
+		if ((Boolean) resultado.get("sucesso"))
 		{
 			return ResponseEntity.ok(resultado);
 		}
@@ -81,7 +81,7 @@ public class DadosController
 	
 		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  tabela, false);
 
-		if ((Boolean) resultado.get("success"))
+		if ((Boolean) resultado.get("sucesso"))
 		{
 			return ResponseEntity.ok(resultado);
 		}
@@ -99,7 +99,7 @@ public class DadosController
 	
 		Map<String, Object> resultado = sincronizacaoService.sincronizarDados(base,  null, false);
 
-		if ((Boolean) resultado.get("success"))
+		if ((Boolean) resultado.get("sucesso"))
 		{
 			return ResponseEntity.ok(resultado);
 		}

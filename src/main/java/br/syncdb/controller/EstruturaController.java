@@ -34,7 +34,7 @@ public class EstruturaController {
 			return ResponseEntity.ok(bases);
 		}
 
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"NÃO EXISTE BASES\"}");
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"Base informada não existe\"}");
 	}
 
 	@GetMapping(value = "/verificar/{base}", produces = "application/json")
@@ -42,7 +42,7 @@ public class EstruturaController {
 	{
 		Map<String, Object>  resultado = sincronizacaoService.verificarEstrutura(base,  null);
 
-		if ((Boolean) resultado.get("success"))
+		if ((Boolean) resultado.get("sucesso"))
 		{
 			return ResponseEntity.ok(resultado);
 		}
@@ -59,7 +59,7 @@ public class EstruturaController {
 	{
 		Map<String, Object>  resultado = sincronizacaoService.sincronizarEstrutura(base,  null);
 
-		if ((Boolean) resultado.get("success"))
+		if ((Boolean) resultado.get("sucesso"))
 		{
 			return ResponseEntity.ok(resultado);
 		}
@@ -75,7 +75,7 @@ public class EstruturaController {
 	
 		Map<String, Object> resultado = sincronizacaoService.sincronizarEstrutura(base,  tabela);
 
-		if ((Boolean) resultado.get("success"))
+		if ((Boolean) resultado.get("sucesso"))
 		{
 			return ResponseEntity.ok(resultado);
 		}

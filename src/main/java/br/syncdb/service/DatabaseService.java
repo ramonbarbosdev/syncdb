@@ -147,11 +147,7 @@ public class DatabaseService
         return false; 
     }
 
-    public String extrairSchema(String nomeTabela)
-    {
-        if (nomeTabela.contains("."))  return nomeTabela.split("\\.")[0];
-        return null; 
-    }
+   
 
     public boolean schemaExiste(Connection conexao, String nomeSchema) throws SQLException
     {
