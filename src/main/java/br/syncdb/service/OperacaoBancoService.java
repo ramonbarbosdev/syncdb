@@ -86,11 +86,8 @@ public class OperacaoBancoService
 
     }
 
-    public  void executarQueriesEmLotes(
-        Connection conexao,
-        HashMap<String, List<String>> queries,
-        List<Map<String, String>> detalhes
-    ) {
+    public  void executarQueriesEmLotes(  Connection conexao,    HashMap<String, List<String>> queries,  List<Map<String, String>> detalhes  )
+    {
         try {
             conexao.setAutoCommit(false);
 
@@ -98,18 +95,21 @@ public class OperacaoBancoService
             AtomicInteger tabelasProcessadas = new AtomicInteger(0);
             processoService.enviarProgresso("Iniciando", 0, "Iniciando processamento de queries", null);
 
-            for (Map.Entry<String, List<String>> entry : queries.entrySet()) {
+            for (Map.Entry<String, List<String>> entry : queries.entrySet())
+            {
                 String tipo = entry.getKey();
                 List<String> lista = entry.getValue();
 
                 System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
 
-                for (String query : lista) {
+                for (String query : lista)
+                {
                     String tabela = extrairNomeTabelaDaQuery(query);
                     int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
                     processoService.enviarProgresso("Processando", progresso, "Processando da tabela: " + tabela, tabela);
 
-                    try (java.sql.Statement stmt = conexao.createStatement()) {
+                    try (java.sql.Statement stmt = conexao.createStatement())
+                    {
                         stmt.execute(query);
                         System.out.println("Executada com sucesso:\n" + query);
                     } catch (SQLException e) {
@@ -130,7 +130,7 @@ public class OperacaoBancoService
             conexao.commit();
 
         } catch (SQLException e) {
-            System.err.println("🛑 Falha na transação geral: " + e.getMessage());
+            System.err.println("Falha na transação geral: " + e.getMessage());
             try {
                 conexao.rollback();
             } catch (SQLException ex) {
@@ -144,7 +144,7 @@ public class OperacaoBancoService
             }
         }
     }
-      public String extrairNomeTabelaDaQuery(String query) {
+    public String extrairNomeTabelaDaQuery(String query) {
         query = query.trim().toUpperCase();
     
         String patternCreate = "CREATE TABLE IF NOT EXISTS ([\\w\\.]+)";

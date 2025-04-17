@@ -366,16 +366,19 @@ public class DatabaseService
     public  String  criarSequenciaQuery(Connection conexaoCloud, Connection conexaoLocal)  throws SQLException
     {
         StringBuilder createTableScript = new StringBuilder();
-
-        String querySequencias = "SELECT schemaname, sequencename FROM pg_sequences "; 
-        try (Statement stmtCloud = conexaoCloud.createStatement();
-             ResultSet rsCloud = stmtCloud.executeQuery(querySequencias))
+        try 
         {
+            StringBuilder query = new StringBuilder(
+                "SELECT schemaname, sequencename FROM pg_sequences where schemaname = ?;"
+            );
     
-            while (rsCloud.next())
+            PreparedStatement stmt = conexaoCloud.prepareStatement(query.toString());
+            stmt.setString(1, "patrimonio");
+            ResultSet rs = stmt.executeQuery();
+    
+            while (rs.next())
             {
-                String nomeSequenciaCloud = rsCloud.getString("sequencename");
-    
+                String  nomeSequenciaCloud = rs.getString("schemaname");
                 if (!sequenciaExiste(conexaoLocal, nomeSequenciaCloud))
                 {
                     String createSequenceQuery = String.format(
@@ -383,12 +386,14 @@ public class DatabaseService
                         nomeSequenciaCloud);
                     createTableScript.append(createSequenceQuery+"\n");
                 }
-            
             }
+        }
+        catch(Exception e)
+        {
+            System.out.println(e);
         }
 
         return createTableScript.length() > 0 ?  createTableScript.toString() : null;
-        
     }
 
    
