@@ -13,12 +13,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ConexaoBanco {
 
-    
 
-    // Mapa para armazenar os pools de conexão por banco
     private static final Map<String, HikariDataSource> dataSourceMap = new ConcurrentHashMap<>();
 
-    // Método para criar dinamicamente um pool para uma base específica
     private static HikariDataSource criarDataSource(String host, String port, String database, String user, String password) {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://" + host + ":" + port + "/" + database);
@@ -33,46 +30,84 @@ public class ConexaoBanco {
     }
 
    
-    public static Connection abrirConexao(String database,  TipoConexao tipo) throws SQLException
-    {
-        String prefixo = tipo.getPrefixo();
-
+    public static Connection abrirConexao(String database, TipoConexao tipo) throws SQLException {
+        String prefixo = tipo.getPrefixo(); // exemplo: "local." ou "cloud."
         String host = ConfiguracaoBanco.get(prefixo + ".host");
         String port = ConfiguracaoBanco.get(prefixo + ".port");
         String user = ConfiguracaoBanco.get(prefixo + ".user");
         String password = ConfiguracaoBanco.get(prefixo + ".password");
-
-        String url = "jdbc:postgresql://" + host + ":" + port + "/" + database;
-        Connection connection = null;
-        try
+    
+        String chave = database + "_" + tipo.name(); 
+    
+        HikariDataSource dataSource = dataSourceMap.get(chave);
+        if (dataSource == null)
         {
-            connection = DriverManager.getConnection(url, user, password);
+            System.err.println("Nova Conexao: "+database);
+            synchronized (ConexaoBanco.class) {
+                dataSource = dataSourceMap.get(chave);
+                if (dataSource == null) {
+                    dataSource = criarDataSource(host, port, database, user, password);
+                    dataSourceMap.put(chave, dataSource);
+                }
+            }
         }
-        catch (SQLException e)
+        else
         {
-            // System.err.println(e.getMessage() + " Base: " + database + ". Conexao: "+ tipo); 
-            throw new SQLException(e.getMessage() + " Base: " + database + ". Conexao: "+ tipo);
+            System.err.println("Conexao existente: "+database);
         }
-
-        return connection; 
-
+        
+        return dataSource.getConnection();
     }
+    
+    
 
-    // Método para fechar o pool de conexão de uma base específica
-    public static void fecharConexao(String database) {
-        HikariDataSource dataSource = dataSourceMap.get(database);
+    public static void fecharConexao(String database, TipoConexao tipo) {
+        String chave = database + "_" + tipo.name();
+        HikariDataSource dataSource = dataSourceMap.get(chave);
+    
         if (dataSource != null) {
-            dataSource.close();
-            dataSourceMap.remove(database);
-            System.out.println("✅ Pool de conexão fechado para o banco: " + database);
+            if (!dataSource.isClosed())
+            {
+                try
+                {
+                    dataSource.close();
+                    System.out.println("Pool de conexão fechado para o banco: " + chave);
+                }
+                catch (Exception e)
+                {
+                    System.err.println("Erro ao fechar o pool para o banco " + chave + ": " + e.getMessage());
+                }
+                finally
+                {
+                    dataSourceMap.remove(chave);
+                }
+            }
+            else
+            {
+                System.out.println("Pool já estava fechado para o banco: " + chave);
+                dataSourceMap.remove(chave); // limpa do mapa mesmo assim
+            }
+        } else {
+            System.out.println("Nenhum pool encontrado para o banco: " + chave);
         }
     }
+    
+    
 
     // Método para fechar todos os pools de conexão
-    public static void fecharTodos() 
+    public static void fecharTodos()
     {
-        for (String database : dataSourceMap.keySet()) {
-            fecharConexao(database);
+        for (Map.Entry<String, HikariDataSource> entry : dataSourceMap.entrySet())
+        {
+            String chave = entry.getKey();
+            HikariDataSource dataSource = entry.getValue();
+            if (dataSource != null)
+            {
+                dataSource.close();
+                System.out.println("Pool de conexão fechado para: " + chave);
+            }
         }
+        dataSourceMap.clear(); 
     }
+    
 }

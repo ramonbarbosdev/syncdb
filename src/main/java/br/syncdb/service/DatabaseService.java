@@ -44,42 +44,40 @@ public class DatabaseService
     // @Qualifier("cloudDataSource")
     // private JdbcTemplate jdbcTemplate;
 
-    public List<String> listarBases(String nomeBase, TipoConexao  tipo)
+    public List<String> listarBases(String database, TipoConexao  tipo)
     {
         List<String> bases = new ArrayList<>();
 
-        try (Connection conexao = ConexaoBanco.abrirConexao(nomeBase, tipo))
+        try (Connection conexao = ConexaoBanco.abrirConexao(database, tipo))
         {
             String query = "SELECT datname FROM pg_database WHERE datistemplate = false";
 
             var stmt = conexao.createStatement();
             var rs = stmt.executeQuery(query);
 
-            while (rs.next()) {
+            while (rs.next())
+            {
                 bases.add(rs.getString("datname"));
             }
         }
         catch (SQLException e)
         {
-            e.printStackTrace();
+            throw new RuntimeException("Erro ao listar bases: " + e.getMessage(), e);
         }
-        finally
-        {
-            ConexaoBanco.fecharTodos();
-        }
+        
       
         return bases;
     }
 
     
-    public List<String> obterSchema(String base, String esquema,TipoConexao  tipo) 
+    public List<String> obterSchema(String database, String esquema,TipoConexao  tipo) 
     {
         List<String> listar = new ArrayList<>();
-        if(base == null) return null;
+        if(database == null) return null;
 
         try
         {
-            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
 
             StringBuilder query = new StringBuilder(
                 "select  distinct  table_schema FROM information_schema.tables where table_schema  not in  ('pg_catalog', 'information_schema')"
@@ -113,19 +111,19 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database, tipo);
         }
             
         return listar;
     }
-    public List<String> obterSchemaUnico(String base, String esquema,TipoConexao  tipo) 
+    public List<String> obterSchemaUnico(String database, String esquema,TipoConexao  tipo) 
     {
         List<String> listar = new ArrayList<>();
-        if(base == null) return null;
+        if(database == null) return null;
 
         try
         {
-            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
 
             StringBuilder query = new StringBuilder(
                 "SELECT nspname  FROM pg_namespace WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')"
@@ -159,18 +157,18 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database, tipo);
         }   
         return listar;
     }
-    public List<String> obterBanco(String base, String esquema,  TipoConexao  tipo) 
+    public List<String> obterBanco(String database, String esquema,  TipoConexao  tipo) 
     {
         List<String> listar = new ArrayList<>();
-        if(base == null) return null;
+        if(database == null) return null;
 
         try
         {
-            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
 
             StringBuilder query = new StringBuilder(
                 "SELECT table_schema, table_name FROM information_schema.tables " +
@@ -203,19 +201,19 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database, tipo);
         }         
         return listar;
     }
    
 
 
-    public boolean verificarTabelaExistente( String base, TipoConexao tipo, String tabelaNome) throws SQLException
+    public boolean verificarTabelaExistente( String database, TipoConexao tipo, String tabelaNome) throws SQLException
     {
 
         try
         {
-            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
 
             String query = "SELECT EXISTS (" +
                         "SELECT 1 " +
@@ -237,7 +235,7 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database, tipo);
         }
        
         return false; 
@@ -285,26 +283,28 @@ public class DatabaseService
         Map<String, String> serialColumns = new HashMap<>();
         try (PreparedStatement stmt = conexao.prepareStatement(
                 "SELECT column_name, column_default FROM information_schema.columns " +
-                "WHERE table_schema = ? AND table_name = ? AND column_default LIKE 'nextval%'")) {
+                "WHERE table_schema = ? AND table_name = ? AND column_default LIKE 'nextval%'"))
+        {
             stmt.setString(1, schema);
             stmt.setString(2, nomeTabela);
             ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
+            while (rs.next())
+            {
                 String colName = rs.getString("column_name");
-                String rawDefault = rs.getString("column_default"); 
+                String rawDefault = rs.getString("column_default");
                 String clean = rawDefault.replace("::regclass", "").replace("nextval(", "").replace("'", "").replace(")", "").trim();
-                String seqSemSchema = clean.contains(".") ? clean.split("\\.")[1] : clean;
-                String seqDef = "nextval('" + seqSemSchema + "'::regclass)";
+                String seqDef = "nextval('" + clean + "'::regclass)"; // <-- aqui corrigido para manter o schema
                 serialColumns.put(colName, seqDef);
             }
         }
     
-        // Construir a definição da tabela
         createTableScript.append("CREATE TABLE ").append(schema).append(".").append(nomeTabela).append(" (\n");
     
         DatabaseMetaData metaData = conexao.getMetaData();
-        try (ResultSet columns = metaData.getColumns(null, schema, nomeTabela, null)) {
-            while (columns.next()) {
+        try (ResultSet columns = metaData.getColumns(null, schema, nomeTabela, null))
+        {
+            while (columns.next())
+            {
                 String colName = columns.getString("COLUMN_NAME").trim();
                 String typeName = columns.getString("TYPE_NAME").trim();
                 boolean isNullable = "1".equals(columns.getString("NULLABLE"));
@@ -312,23 +312,33 @@ public class DatabaseService
     
                 createTableScript.append("    ").append(colName).append(" ");
     
-                if (serialColumns.containsKey(colName)) {
+                if (serialColumns.containsKey(colName))
+                {
                     createTableScript.append("integer");
-                } else {
+                }
+                else
+                {
                     createTableScript.append(typeName);
                 }
     
-                if (!isNullable) {
+                if (!isNullable)
+                {
                     createTableScript.append(" NOT NULL");
                 }
     
-                if (serialColumns.containsKey(colName)) {
+                if (serialColumns.containsKey(colName))
+                {
                     createTableScript.append(" DEFAULT ").append(serialColumns.get(colName));
-                } else if (defaultValue != null && !defaultValue.isEmpty()) {
-                    if (defaultValue.toLowerCase().contains("uuid_generate_v4()")) {
+                }
+                else if (defaultValue != null && !defaultValue.isEmpty())
+                {
+                    if (defaultValue.toLowerCase().contains("uuid_generate_v4()"))
+                    {
                         needsUuidOssp = true;
                         createTableScript.append(" DEFAULT uuid_generate_v4()");
-                    } else {
+                    }
+                    else
+                    {
                         String cleanDefault = defaultValue.split("::")[0].trim();
                         createTableScript.append(" DEFAULT ").append(cleanDefault);
                     }
@@ -339,30 +349,37 @@ public class DatabaseService
         }
     
         // Adicionar chave primária
-        try (ResultSet pkRs = metaData.getPrimaryKeys(null, schema, nomeTabela)) {
+        try (ResultSet pkRs = metaData.getPrimaryKeys(null, schema, nomeTabela))
+        {
             List<String> pkColumns = new ArrayList<>();
-            while (pkRs.next()) {
+            while (pkRs.next())
+            {
                 pkColumns.add(pkRs.getString("COLUMN_NAME"));
             }
     
-            if (!pkColumns.isEmpty()) {
+            if (!pkColumns.isEmpty())
+            {
                 createTableScript.append("    PRIMARY KEY (")
                         .append(String.join(", ", pkColumns))
                         .append(")\n");
-            } else {
-                createTableScript.setLength(createTableScript.length() - 2);
+            }
+            else
+            {
+                createTableScript.setLength(createTableScript.length() - 2); // Remove última vírgula
                 createTableScript.append("\n");
             }
         }
     
         createTableScript.append(");");
     
-        if (needsUuidOssp) {
+        if (needsUuidOssp)
+        {
             createTableScript.insert(0, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n");
         }
     
         return createTableScript.toString();
     }
+    
     
 
     public  String  criarSequenciaQuery(Connection conexaoCloud, Connection conexaoLocal)  throws SQLException
@@ -572,10 +589,7 @@ public class DatabaseService
         {
             throw new RuntimeException(e);
         }
-        finally
-        {
-            ConexaoBanco.fecharConexao(base);
-        }
+        
     }
 
     public  Set<String>  obterColunaMetaData(String base, Connection conexao, String nomeTabela)
@@ -602,10 +616,7 @@ public class DatabaseService
         {
             throw new RuntimeException(e);
         }
-        finally
-        {
-            ConexaoBanco.fecharConexao(base);
-        }
+        
     }
 
     public TableMetadata obterTodosMetadados(Connection conexao, String nomeTabela) throws SQLException {

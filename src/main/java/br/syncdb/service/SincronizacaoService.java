@@ -58,25 +58,6 @@ public class SincronizacaoService
     private CacheService cacheService;
 
     
-    
-    private void finalizarConexoes(Connection conexaoCloud, Connection conexaoLocal)
-    {
-        try
-        {
-          
-            if (conexaoLocal != null && !conexaoLocal.isClosed())
-            {
-                conexaoLocal.setAutoCommit(true); // banco faz o COMMIT automaticamente 
-            }
-        }
-        catch (SQLException e)
-        {
-            System.out.println("Erro ao restaurar auto-commit "+e );
-        }
-        // System.out.println("fechar");
-        
-        ConexaoBanco.fecharTodos();
-    }
-     
+   
    
 }

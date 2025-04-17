@@ -90,23 +90,23 @@ public class OperacaoBancoService
     public void executarQueriesEmLotes(Connection conexao, HashMap<String, List<String>> queries, List<Map<String, String>> detalhes) {
         try
         {
-            conexao.setAutoCommit(false);
-    
-            processoService.enviarProgresso("Iniciando", 0, "Iniciando processamento de queries", null);
-    
             int totalQueries = queries.values().stream().mapToInt(List::size).sum();
             AtomicInteger queriesExecutadas = new AtomicInteger(0);
-    
+        
+            // Deixar o commit manual
+            conexao.setAutoCommit(false);
+        
             for (Map.Entry<String, List<String>> grupo : queries.entrySet())
             {
                 String tipo = grupo.getKey();
                 List<String> listaQueries = grupo.getValue();
     
                 executarGrupoDeQueries(conexao, tipo, listaQueries, detalhes, totalQueries, queriesExecutadas);
+                conexao.commit();
+
             }
     
             processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
-            conexao.commit();
     
         } catch (SQLException e) {
             System.err.println("Falha na transação geral: " + e.getMessage());
@@ -126,7 +126,7 @@ public class OperacaoBancoService
 
     private void executarGrupoDeQueries(Connection conexao, String tipo, List<String> queries, List<Map<String, String>> detalhes, int totalQueries, AtomicInteger queriesExecutadas) throws SQLException {
         if (queries == null || queries.isEmpty()) return;
-    
+
         System.out.println("\n=== Executando grupo: " + tipo + " ===");
     
         for (String query : queries)
@@ -139,13 +139,9 @@ public class OperacaoBancoService
             try (java.sql.Statement stmt = conexao.createStatement())
             {
                 stmt.execute(query);
-                System.out.println("Executada: " + tabela);
             }
             catch (SQLException e)
             {
-                System.out.println("Erro ao executar: " + tipo);
-                System.out.println(e.getMessage());
-    
                 Map<String, String> criarDetalhe = new LinkedHashMap<>();
                 criarDetalhe.put("tabela", tabela);
                 criarDetalhe.put("acao", tipo);
@@ -155,6 +151,9 @@ public class OperacaoBancoService
                 throw e; 
             }
         }
+    
+        conexao.commit();
+
     }
     
     

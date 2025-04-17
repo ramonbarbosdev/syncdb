@@ -57,7 +57,7 @@ public class EstruturaService {
     @Autowired
     private CacheService cacheService;
 
-    public Map<String, Object> verificarEstrutura(String base, String nomeTabela)
+    public Map<String, Object> verificarEstrutura(String database, String nomeTabela)
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
         List<EstruturaTabela> detalhes = new ArrayList<>();
@@ -66,15 +66,15 @@ public class EstruturaService {
         Connection conexaoLocal = null; 
         try
         {
-            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
 
-            Set<String> tabelasLocal = obterTabelas(conexaoLocal, base, nomeTabela);
-            Set<String> tabelasCloud = obterTabelas(conexaoCloud, base, nomeTabela);
+            Set<String> tabelasLocal = obterTabelas(conexaoLocal, database, nomeTabela);
+            Set<String> tabelasCloud = obterTabelas(conexaoCloud, database, nomeTabela);
 
-            HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,base, nomeTabela);
+            HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,database, nomeTabela);
 
-            cacheService.salvarCache(base + "_estrutura:", queries);
+            cacheService.salvarCache(database + "_estrutura:", queries);
             
             response.put("tabelas_afetadas", detalhes); 
             response.put("sucesso", true); 
@@ -85,13 +85,14 @@ public class EstruturaService {
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database,  TipoConexao.CLOUD);
+            ConexaoBanco.fecharConexao( database,  TipoConexao.LOCAL);
         }
 
         return response;
     }
 
-    public Map<String, Object> sincronizarEstrutura(String base)
+    public Map<String, Object> sincronizarEstrutura(String database)
     {
         Map<String, Object> response = new LinkedHashMap<>();
         List<Map<String, String>> detalhes = new ArrayList<>();
@@ -99,9 +100,9 @@ public class EstruturaService {
         Connection conexaoLocal = null; 
         try
         {
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
             @SuppressWarnings("unchecked")
-            HashMap<String, List<String>> querys = cacheService.buscarCache(base + "_estrutura:", HashMap.class);
+            HashMap<String, List<String>> querys = cacheService.buscarCache(database + "_estrutura:", HashMap.class);
 
             if (querys == null)
             {
@@ -123,7 +124,7 @@ public class EstruturaService {
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database,  TipoConexao.LOCAL);
         }
 
         return response; 

@@ -61,7 +61,7 @@ public class DadosService
 
 
 
-     public Map<String, Object> verificarDados(String base, String tabela)
+     public Map<String, Object> verificarDados(String database, String tabela)
     {
         Connection conexaoCloud = null;
         Connection conexaoLocal = null;
@@ -70,12 +70,12 @@ public class DadosService
        
         try
         {
-            conexaoCloud = ConexaoBanco.abrirConexao(base, TipoConexao.CLOUD);
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD);
+            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
 
             HashMap<String, List<String>> querys = obterDadosTabela(conexaoCloud,conexaoLocal, tabela, detalhes );
 
-            cacheService.salvarCache(base + "_dados:", querys);
+            cacheService.salvarCache(database + "_dados:", querys);
 
             response.put("sucesso", true); 
             response.put("tabelas_afetadas", detalhes); 
@@ -87,12 +87,12 @@ public class DadosService
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database, TipoConexao.CLOUD);
         }
         
         return response;
     }
-    public Map<String, Object> sincronizarDados(String base, String tabela, Boolean fl_verificacao)
+    public Map<String, Object> sincronizarDados(String database, String tabela, Boolean fl_verificacao)
     {
        
         Connection conexaoLocal = null;
@@ -101,13 +101,13 @@ public class DadosService
        
         try
         {
-            conexaoLocal = ConexaoBanco.abrirConexao(base, TipoConexao.LOCAL);
+            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
             conexaoLocal.setAutoCommit(false);
 
             desativarConstraints(conexaoLocal);
 
             @SuppressWarnings("unchecked")
-            HashMap<String, List<String>> querys = cacheService.buscarCache(base + "_dados:", HashMap.class);
+            HashMap<String, List<String>> querys = cacheService.buscarCache(database + "_dados:", HashMap.class);
 
             if (querys == null)
             {
@@ -131,7 +131,7 @@ public class DadosService
         }
         finally
         {
-            ConexaoBanco.fecharTodos();
+            ConexaoBanco.fecharConexao( database, TipoConexao.LOCAL);
         }
         
         return response;
