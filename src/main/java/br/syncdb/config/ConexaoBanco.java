@@ -69,7 +69,8 @@ public class ConexaoBanco {
     }
 
     // Método para fechar todos os pools de conexão
-    public static void fecharTodos() {
+    public static void fecharTodos() 
+    {
         for (String database : dataSourceMap.keySet()) {
             fecharConexao(database);
         }

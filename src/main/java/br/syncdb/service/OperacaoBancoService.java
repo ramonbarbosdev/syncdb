@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 import br.syncdb.model.EstruturaTabela;
 import br.syncdb.model.TabelaDetalhe;
 
+
 @Service
 public class OperacaoBancoService
 {
@@ -86,49 +87,27 @@ public class OperacaoBancoService
 
     }
 
-    public  void executarQueriesEmLotes(  Connection conexao,    HashMap<String, List<String>> queries,  List<Map<String, String>> detalhes  )
-    {
-        try {
+    public void executarQueriesEmLotes(Connection conexao, HashMap<String, List<String>> queries, List<Map<String, String>> detalhes) {
+        try
+        {
             conexao.setAutoCommit(false);
-
-            int totalTabelas = queries.size();
-            AtomicInteger tabelasProcessadas = new AtomicInteger(0);
+    
             processoService.enviarProgresso("Iniciando", 0, "Iniciando processamento de queries", null);
-
-            for (Map.Entry<String, List<String>> entry : queries.entrySet())
+    
+            int totalQueries = queries.values().stream().mapToInt(List::size).sum();
+            AtomicInteger queriesExecutadas = new AtomicInteger(0);
+    
+            for (Map.Entry<String, List<String>> grupo : queries.entrySet())
             {
-                String tipo = entry.getKey();
-                List<String> lista = entry.getValue();
-
-                System.out.println("\n=== Executando grupo de queries: " + tipo + " ===");
-
-                for (String query : lista)
-                {
-                    String tabela = extrairNomeTabelaDaQuery(query);
-                    int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
-                    processoService.enviarProgresso("Processando", progresso, "Processando da tabela: " + tabela, tabela);
-
-                    try (java.sql.Statement stmt = conexao.createStatement())
-                    {
-                        stmt.execute(query);
-                        System.out.println("Executada com sucesso:\n" + query);
-                    } catch (SQLException e) {
-                        System.out.println("Executada com erro:\n" + query);
-                       
-                        Map<String, String> criarDetalhe = new LinkedHashMap<>();
-                        criarDetalhe.put("tabela", tabela);
-                        criarDetalhe.put("acao", "execute");
-                        criarDetalhe.put("erro", e.getMessage() + " | SQLState: " + e.getSQLState());
-                        detalhes.add(criarDetalhe);
-
-                        conexao.rollback();
-                    }
-                }
+                String tipo = grupo.getKey();
+                List<String> listaQueries = grupo.getValue();
+    
+                executarGrupoDeQueries(conexao, tipo, listaQueries, detalhes, totalQueries, queriesExecutadas);
             }
-
+    
             processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
             conexao.commit();
-
+    
         } catch (SQLException e) {
             System.err.println("Falha na transação geral: " + e.getMessage());
             try {
@@ -144,6 +123,41 @@ public class OperacaoBancoService
             }
         }
     }
+
+    private void executarGrupoDeQueries(Connection conexao, String tipo, List<String> queries, List<Map<String, String>> detalhes, int totalQueries, AtomicInteger queriesExecutadas) throws SQLException {
+        if (queries == null || queries.isEmpty()) return;
+    
+        System.out.println("\n=== Executando grupo: " + tipo + " ===");
+    
+        for (String query : queries)
+        {
+            String tabela = extrairNomeTabelaDaQuery(query);
+    
+            int progressoAtual = (int) ((queriesExecutadas.incrementAndGet() / (double) totalQueries) * 100);
+            processoService.enviarProgresso("Processando", progressoAtual, "Processando " + tipo + ": " + tabela, tabela);
+    
+            try (java.sql.Statement stmt = conexao.createStatement())
+            {
+                stmt.execute(query);
+                System.out.println("Executada: " + tabela);
+            }
+            catch (SQLException e)
+            {
+                System.out.println("Erro ao executar: " + tipo);
+                System.out.println(e.getMessage());
+    
+                Map<String, String> criarDetalhe = new LinkedHashMap<>();
+                criarDetalhe.put("tabela", tabela);
+                criarDetalhe.put("acao", tipo);
+                criarDetalhe.put("erro", e.getMessage() + " | SQLState: " + e.getSQLState());
+                detalhes.add(criarDetalhe);
+    
+                throw e; 
+            }
+        }
+    }
+    
+    
     public String extrairNomeTabelaDaQuery(String query) {
         query = query.trim().toUpperCase();
     

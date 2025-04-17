@@ -65,8 +65,9 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharConexao(nomeBase);
+            ConexaoBanco.fecharTodos();
         }
+      
         return bases;
     }
 
@@ -112,7 +113,7 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharConexao(base);
+            ConexaoBanco.fecharTodos();
         }
             
         return listar;
@@ -158,9 +159,8 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharConexao(base);
-        }
-            
+            ConexaoBanco.fecharTodos();
+        }   
         return listar;
     }
     public List<String> obterBanco(String base, String esquema,  TipoConexao  tipo) 
@@ -203,9 +203,8 @@ public class DatabaseService
         }
         finally
         {
-            ConexaoBanco.fecharConexao(base);
-        }
-            
+            ConexaoBanco.fecharTodos();
+        }         
         return listar;
     }
    
@@ -236,7 +235,10 @@ public class DatabaseService
         } catch (Exception e) {
             // TODO: handle exception
         }
-
+        finally
+        {
+            ConexaoBanco.fecharTodos();
+        }
        
         return false; 
     }
@@ -378,12 +380,14 @@ public class DatabaseService
     
             while (rs.next())
             {
-                String  nomeSequenciaCloud = rs.getString("schemaname");
+                String  nomeEsquemaCloud = rs.getString("schemaname");
+                String  nomeSequenciaCloud = rs.getString("sequencename");
                 if (!sequenciaExiste(conexaoLocal, nomeSequenciaCloud))
                 {
+                    String sequenciaCompleta = nomeEsquemaCloud+"."+nomeSequenciaCloud;
                     String createSequenceQuery = String.format(
                         "CREATE SEQUENCE IF NOT EXISTS %s START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;",
-                        nomeSequenciaCloud);
+                        sequenciaCompleta);
                     createTableScript.append(createSequenceQuery+"\n");
                 }
             }

@@ -85,6 +85,10 @@ public class DadosService
         {
             tratarErroSincronizacao(response, conexaoLocal, e);
         }
+        finally
+        {
+            ConexaoBanco.fecharTodos();
+        }
         
         return response;
     }

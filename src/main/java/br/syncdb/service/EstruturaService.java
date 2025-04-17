@@ -83,6 +83,10 @@ public class EstruturaService {
         {
             tratarErroSincronizacao(response, conexaoLocal, e);
         }
+        finally
+        {
+            ConexaoBanco.fecharTodos();
+        }
 
         return response;
     }
@@ -116,6 +120,10 @@ public class EstruturaService {
         catch (Exception e)
         {
             tratarErroSincronizacao(response, conexaoLocal, e);
+        }
+        finally
+        {
+            ConexaoBanco.fecharTodos();
         }
 
         return response; 
