@@ -382,7 +382,7 @@ public class DatabaseService
     
     
 
-    public  String  criarSequenciaQuery(Connection conexaoCloud, Connection conexaoLocal)  throws SQLException
+    public  String  criarSequenciaQuery(Connection conexaoCloud, Connection conexaoLocal, String esquema)  throws SQLException
     {
         StringBuilder createTableScript = new StringBuilder();
         try 
@@ -392,7 +392,7 @@ public class DatabaseService
             );
     
             PreparedStatement stmt = conexaoCloud.prepareStatement(query.toString());
-            stmt.setString(1, "patrimonio");
+            stmt.setString(1, esquema);
             ResultSet rs = stmt.executeQuery();
     
             while (rs.next())

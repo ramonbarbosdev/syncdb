@@ -19,19 +19,13 @@ import br.syncdb.service.SincronizacaoService;
 @RequestMapping(value = "/estrutura")
 public class EstruturaController {
     
-    @Autowired
-	private SincronizacaoService sincronizacaoService;
-
-	@Autowired
-	private DatabaseService databaseService;
-
 	@Autowired
 	private EstruturaService estruturaService;
 
-	@GetMapping(value = "/verificar/{base}/{tabela}", produces = "application/json")
-	public ResponseEntity<?> verificarEstruturaTabela ( @PathVariable (value = "base") String base , @PathVariable (value = "tabela") String tabela) 
+	@GetMapping(value = "/verificar/{base}/{esquema}/{tabela}", produces = "application/json")
+	public ResponseEntity<?> verificarEstruturaTabela ( @PathVariable (value = "base") String base , @PathVariable (value = "esquema") String esquema, @PathVariable (value = "tabela") String tabela) 
 	{
-		Map<String, Object>  resultado = estruturaService.verificarEstrutura(base,  tabela);
+		Map<String, Object>  resultado = estruturaService.verificarEstrutura(base,esquema,  tabela);
 
 		if ((Boolean) resultado.get("sucesso"))
 		{
@@ -45,10 +39,10 @@ public class EstruturaController {
 
 	}
 
-	@GetMapping(value = "/verificar/{base}/", produces = "application/json")
-	public ResponseEntity<?> verificarEstrutura ( @PathVariable (value = "base") String base ) 
+	@GetMapping(value = "/verificar/{base}/{esquema}", produces = "application/json")
+	public ResponseEntity<?> verificarEstrutura ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema ) 
 	{
-		Map<String, Object>  resultado = estruturaService.verificarEstrutura(base,  null);
+		Map<String, Object>  resultado = estruturaService.verificarEstrutura(base, esquema,  null);
 
 		if ((Boolean) resultado.get("sucesso"))
 		{

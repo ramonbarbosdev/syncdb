@@ -57,7 +57,7 @@ public class EstruturaService {
     @Autowired
     private CacheService cacheService;
 
-    public Map<String, Object> verificarEstrutura(String database, String nomeTabela)
+    public Map<String, Object> verificarEstrutura(String database, String esquema, String nomeTabela)
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
         List<EstruturaTabela> detalhes = new ArrayList<>();
@@ -72,7 +72,7 @@ public class EstruturaService {
             Set<String> tabelasLocal = obterTabelas(conexaoLocal, database, nomeTabela);
             Set<String> tabelasCloud = obterTabelas(conexaoCloud, database, nomeTabela);
 
-            HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,database, nomeTabela);
+            HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,database, esquema, nomeTabela);
 
             cacheService.salvarCache(database + "_estrutura:", queries);
             
@@ -149,6 +149,7 @@ public class EstruturaService {
     Set<String> nomeTabelaLocal,
     List<EstruturaTabela> detalhes,
     String base,
+    String esquema,
     String nomeTabela
     ) 
     throws SQLException
@@ -166,7 +167,7 @@ public class EstruturaService {
         
         Set<String> schemasCriados = new HashSet<>();
         
-        String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal);
+        String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal,esquema);
         if (sequenciaQuery != null)  sequencias.add(sequenciaQuery);
 
         for (String itemTabela : tabelasCloud)
