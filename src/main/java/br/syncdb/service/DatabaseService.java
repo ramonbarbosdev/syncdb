@@ -71,7 +71,7 @@ public class DatabaseService
     }
 
     
-    public List<String> obterSchema(String base, TipoConexao  tipo) 
+    public List<String> obterSchema(String base, String esquema,TipoConexao  tipo) 
     {
         List<String> listar = new ArrayList<>();
         if(base == null) return null;
@@ -80,13 +80,74 @@ public class DatabaseService
         {
             Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
 
-            String query = "select  distinct  table_schema FROM information_schema.tables where table_schema  not in  ('pg_catalog', 'information_schema')";
-            var stmt = conexao.createStatement();
-            var rs = stmt.executeQuery(query);
-        
+            StringBuilder query = new StringBuilder(
+                "select  distinct  table_schema FROM information_schema.tables where table_schema  not in  ('pg_catalog', 'information_schema')"
+            );
+    
+            if (esquema != null && !esquema.isBlank())
+            {
+                query.append(" AND table_schema = ?");
+            }
+    
+            PreparedStatement stmt = conexao.prepareStatement(query.toString());
+
+            if (esquema != null && !esquema.isBlank())
+            {
+                stmt.setString(1, esquema);
+            }
+    
+
+            ResultSet rs = stmt.executeQuery();
+
             while (rs.next())
             {
                 String schema = rs.getString("table_schema");
+                listar.add(schema);
+            }
+
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+        }
+        finally
+        {
+            ConexaoBanco.fecharConexao(base);
+        }
+            
+        return listar;
+    }
+    public List<String> obterSchemaUnico(String base, String esquema,TipoConexao  tipo) 
+    {
+        List<String> listar = new ArrayList<>();
+        if(base == null) return null;
+
+        try
+        {
+            Connection conexao = ConexaoBanco.abrirConexao(base, tipo);
+
+            StringBuilder query = new StringBuilder(
+                "SELECT nspname  FROM pg_namespace WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')"
+            );
+    
+            if (esquema != null && !esquema.isBlank())
+            {
+                query.append("  AND nspname = ?");
+            }
+    
+            PreparedStatement stmt = conexao.prepareStatement(query.toString());
+
+            if (esquema != null && !esquema.isBlank())
+            {
+                stmt.setString(1, esquema);
+            }
+    
+
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next())
+            {
+                String schema = rs.getString("nspname");
                 listar.add(schema);
             }
 

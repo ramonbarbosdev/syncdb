@@ -543,6 +543,8 @@ public class DadosService
             {
                 TabelaDetalhe infoDetalhe = new TabelaDetalhe();
 
+              
+
                 if ((Boolean) parametros.get("novo"))
                 {
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
@@ -568,7 +570,7 @@ public class DadosService
                         detalhes.add(infoDetalhe);
                         criacaoAtualizacaoSeq.add(querySeq);
                     }
-                   
+                  
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
@@ -582,6 +584,7 @@ public class DadosService
                         infoDetalhe.setTabela(itemTabela);
                         infoDetalhe.setAcao("Atualização");
                         infoDetalhe.setLinhaAtualizadas(query.size());
+                        infoDetalhe.setQuerys(String.join(";\n", query));
                         detalhes.add(infoDetalhe);
                         atualizacaoDados.addAll(query);
                     }

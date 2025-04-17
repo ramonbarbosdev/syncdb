@@ -42,61 +42,12 @@ public class DadosController
     @Autowired
 	private SincronizacaoService sincronizacaoService;
 
-	@Autowired
-	private DatabaseService databaseService;
 
 	@Autowired
 	private DadosService dadosService;
 
-	@GetMapping(value = "/bases/", produces = "application/json")
-	public ResponseEntity<?> obterEstruturas ( ) 
-	{
-		List<String> bases = databaseService.listarBases("w5i_tecnologia", TipoConexao.CLOUD);
-
-		if(!bases.isEmpty())
-		{
-			return ResponseEntity.ok(bases);
-		}
-
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Base informada não existe.\"}");
-	}
-
-	@GetMapping(value = "/base/esquema/{base}", produces = "application/json")
-	public ResponseEntity<?> obterSchemaTabelaBase ( @PathVariable (value = "base") String base   ) 
-	{
-		List<String> esquema = databaseService.obterSchema(base, TipoConexao.CLOUD);
-
-		if(!esquema.isEmpty()) return ResponseEntity.ok(esquema);
-
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Esquema informada não existe\"}");
-	}
-	@GetMapping(value = "/base/tabela/{base}/{esquema}", produces = "application/json")
-	public ResponseEntity<?> obterTabelaBase ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema     ) 
-	{
-		List<String> tabelas = databaseService.obterBanco(base,esquema, TipoConexao.CLOUD);
-
-		if(!tabelas.isEmpty()) return ResponseEntity.ok(tabelas);
-
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Tabela informada não existe\"}");
-	}
-
-
-	@GetMapping(value = "/verificar/{base}/{tabela}", produces = "application/json")
-	public ResponseEntity<?> verificarDadosTabela ( @PathVariable (value = "base") String base, @PathVariable (value = "tabela") String tabela ) 
-	{
-		Map<String, Object>  resultado = dadosService.verificarDados(base,  tabela);
-
-		if ((Boolean) resultado.get("sucesso"))
-		{
-			return ResponseEntity.ok(resultado);
-		}
-		else
-		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
-		}
-	}
 	
+
 	@GetMapping(value = "/verificar/{base}", produces = "application/json")
 	public ResponseEntity<?> verificarDados ( @PathVariable (value = "base") String base ) 
 	{

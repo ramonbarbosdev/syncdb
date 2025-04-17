@@ -27,37 +27,6 @@ public class EstruturaController {
 
 	@Autowired
 	private EstruturaService estruturaService;
-	
-	@GetMapping(value = "/bases/", produces = "application/json")
-	public ResponseEntity<?> obterBase ( ) 
-	{
-		List<String> bases = databaseService.listarBases("w5i_tecnologia", TipoConexao.CLOUD);
-
-		if(!bases.isEmpty())
-		{
-			return ResponseEntity.ok(bases);
-		}
-
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Base informada não existe\"}");
-	}
-	@GetMapping(value = "/base/esquema/{base}", produces = "application/json")
-	public ResponseEntity<?> obterSchemaTabelaBase ( @PathVariable (value = "base") String base   ) 
-	{
-		List<String> esquema = databaseService.obterSchema(base, TipoConexao.CLOUD);
-
-		if(!esquema.isEmpty()) return ResponseEntity.ok(esquema);
-
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Esquema informada não existe\"}");
-	}
-	@GetMapping(value = "/base/tabela/{base}/{esquema}", produces = "application/json")
-	public ResponseEntity<?> obterTabelaBase ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema     ) 
-	{
-		List<String> tabelas = databaseService.obterBanco(base,esquema, TipoConexao.CLOUD);
-
-		if(!tabelas.isEmpty()) return ResponseEntity.ok(tabelas);
-
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Tabela informada não existe\"}");
-	}
 
 	@GetMapping(value = "/verificar/{base}/{tabela}", produces = "application/json")
 	public ResponseEntity<?> verificarEstruturaTabela ( @PathVariable (value = "base") String base , @PathVariable (value = "tabela") String tabela) 
