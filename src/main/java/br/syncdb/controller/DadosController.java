@@ -48,8 +48,8 @@ public class DadosController
 
 	
 
-	@GetMapping(value = "/verificar/{base}", produces = "application/json")
-	public ResponseEntity<?> verificarDados ( @PathVariable (value = "base") String base ) 
+	@GetMapping(value = "/verificar/{base}/{esquema}", produces = "application/json")
+	public ResponseEntity<?> verificarDados (@PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema ) 
 	{
 		Map<String, Object>  resultado = dadosService.verificarDados(base,  null);
 

@@ -62,4 +62,6 @@ public class SincronizacaoController
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"O Esquema '"+esquema+"'' não existe no banco de dados local.\"}");
 	}
 
+	
+
 }

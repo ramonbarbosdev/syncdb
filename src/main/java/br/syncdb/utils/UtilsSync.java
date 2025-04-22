@@ -1,5 +1,7 @@
 package br.syncdb.utils;
 
+import java.util.Map;
+
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,4 +18,16 @@ public class UtilsSync {
         if (nomeTabela.contains("."))  return nomeTabela.split("\\.")[1];
         return null; 
     }
+
+    public void  tratarErroSincronizacao(Map<String, Object> response, Exception e)
+    {        
+        String errorType = e.getClass().getSimpleName();
+        String details = e.getMessage();
+
+        response.put("sucesso", false);
+        response.put("erro",errorType);
+        response.put("mensagem", "Erro durante sincronização");
+        response.put("detalhes", details);
+    }
+    
 }

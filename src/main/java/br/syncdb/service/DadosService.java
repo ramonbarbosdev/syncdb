@@ -63,16 +63,11 @@ public class DadosService
 
      public Map<String, Object> verificarDados(String database, String tabela)
     {
-        Connection conexaoCloud = null;
-        Connection conexaoLocal = null;
         Map<String, Object> response = new HashMap<String, Object>();
         List<TabelaDetalhe> detalhes = new ArrayList<>();
        
-        try
+        try (Connection conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD); Connection conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL) )
         {
-            conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD);
-            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
-
             HashMap<String, List<String>> querys = obterDadosTabela(conexaoCloud,conexaoLocal, tabela, detalhes );
 
             cacheService.salvarCache(database + "_dados:", querys);
@@ -83,25 +78,18 @@ public class DadosService
         }
         catch (Exception e)
         {
-            tratarErroSincronizacao(response, conexaoLocal, e);
-        }
-        finally
-        {
-            ConexaoBanco.fecharConexao( database, TipoConexao.CLOUD);
+            utilsSync.tratarErroSincronizacao(response, e);
         }
         
         return response;
     }
     public Map<String, Object> sincronizarDados(String database, String tabela, Boolean fl_verificacao)
     {
-       
-        Connection conexaoLocal = null;
         Map<String, Object> response = new HashMap<String, Object>();
         List<Map<String, String>> detalhes = new ArrayList<>();
        
-        try
+        try (Connection conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL) )
         {
-            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
             conexaoLocal.setAutoCommit(false);
 
             desativarConstraints(conexaoLocal);
@@ -127,28 +115,11 @@ public class DadosService
         }
         catch (Exception e)
         {
-            tratarErroSincronizacao(response, conexaoLocal, e);
-        }
-        finally
-        {
-            ConexaoBanco.fecharConexao( database, TipoConexao.LOCAL);
+            utilsSync.tratarErroSincronizacao(response, e);
         }
         
         return response;
-    }
-
-    
-    private void    tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)
-    {        
-        String errorType = e.getClass().getSimpleName();
-        String details = e.getMessage();
-
-        response.put("sucesso", false);
-        response.put("erro",errorType);
-        response.put("mensagem", "Erro durante sincronização");
-        response.put("detalhes", details);
-    }
-    
+    } 
     
     public long obterMaxId(Connection conexao, String tabela, String nomeColuna) throws SQLException
     {

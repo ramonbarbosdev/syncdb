@@ -62,13 +62,8 @@ public class EstruturaService {
         Map<String, Object> response = new LinkedHashMap<>(); 
         List<EstruturaTabela> detalhes = new ArrayList<>();
         
-        Connection conexaoCloud = null;
-        Connection conexaoLocal = null; 
-        try
+        try (Connection conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD); Connection conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL) )
         {
-            conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD);
-            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
-
             Set<String> tabelasLocal = obterTabelas(conexaoLocal, database, nomeTabela);
             Set<String> tabelasCloud = obterTabelas(conexaoCloud, database, nomeTabela);
 
@@ -81,18 +76,9 @@ public class EstruturaService {
         }
         catch (Exception e)
         {
-            tratarErroSincronizacao(response, conexaoLocal, e);
+            utilsSync.tratarErroSincronizacao(response, e);
         }
-        finally
-        {
-            if (conexaoCloud != null) {
-                try { conexaoCloud.close(); } catch (SQLException e) { e.printStackTrace(); }
-            }
-            if (conexaoLocal != null) {
-                try { conexaoLocal.close(); } catch (SQLException e) { e.printStackTrace(); }
-            }
-        }
-
+        
         return response;
     }
 
@@ -101,10 +87,8 @@ public class EstruturaService {
         Map<String, Object> response = new LinkedHashMap<>();
         List<Map<String, String>> detalhes = new ArrayList<>();
 
-        Connection conexaoLocal = null; 
-        try
+        try ( Connection conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL) )
         {
-            conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL);
             @SuppressWarnings("unchecked")
             HashMap<String, List<String>> querys = cacheService.buscarCache(database + "_estrutura:", HashMap.class);
 
@@ -124,31 +108,10 @@ public class EstruturaService {
         }
         catch (Exception e)
         {
-            tratarErroSincronizacao(response, conexaoLocal, e);
+            utilsSync.tratarErroSincronizacao(response, e);
         }
-        finally
-        {
-            if (conexaoLocal != null)
-            {
-                try { conexaoLocal.close(); } catch (SQLException e) { e.printStackTrace(); }
-            }
-        }
-
         return response; 
     }
-
-    
-    private void    tratarErroSincronizacao(Map<String, Object> response, Connection conexaoLocal, Exception e)
-    {        
-        String errorType = e.getClass().getSimpleName();
-        String details = e.getMessage();
-
-        response.put("sucesso", false);
-        response.put("erro",errorType);
-        response.put("mensagem", "Erro durante sincronização");
-        response.put("detalhes", details);
-    }
-
 
     public HashMap<String, List<String>>  processarTabelas(Connection conexaoCloud,
     Connection conexaoLocal,
