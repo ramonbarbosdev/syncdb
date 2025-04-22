@@ -2,6 +2,7 @@ package br.syncdb.security;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.security.SignatureException;
 import java.util.Date;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,8 +12,9 @@ import org.springframework.stereotype.Service;
 import br.syncdb.ApplicationContextLoad;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
-
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -60,17 +62,19 @@ public class JWTTokenAutenticacaoService {
         response.getWriter().write("{\"Authorization\": \"" + token + "\"}");
     }
 
-    public Authentication getAuthentication(HttpServletRequest request, HttpServletResponse response) {
+    public Authentication getAuthentication(HttpServletRequest request, HttpServletResponse response)
+    {
         SecretKeySpec secretKey = createSecretKey();
         String token = request.getHeader(HEADER_STRING);
 
-        if (token == null || !token.startsWith(TOKEN_PREFIX))
+        String cookieToken = obterTokenCookie(request);
+
+        if (cookieToken != null && !cookieToken.isEmpty()) {
+            token = TOKEN_PREFIX + cookieToken;
+        }
+        else
         {
-            String cookieToken = obterTokenCookie(request);
-           
-            if (cookieToken != null && !cookieToken.isEmpty()) {
-                token = TOKEN_PREFIX + cookieToken;
-            }
+            token = request.getHeader(HEADER_STRING);
         }
 
         if (token != null && token.startsWith(TOKEN_PREFIX)) {
@@ -97,47 +101,38 @@ public class JWTTokenAutenticacaoService {
                     }
                 }
 
-            } catch (Exception e) {
+            } 
+            catch (ExpiredJwtException e) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
-
                 try {
-                    response.getWriter().write("{\"error\": \"Erro na autenticação: " + e.getMessage() + "\"}");
-                } catch (IOException e1) {
-                    e1.printStackTrace();
+                    response.getWriter().write("{\"error\": \"Token expirado.\"}");
+                } catch (IOException ex) {
+                    ex.printStackTrace();
                 }
             }
+            catch (MalformedJwtException e) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                try {
+                    response.getWriter().write("{\"error\": \"Token malformado.\"}");
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            catch (Exception e) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                try {
+                    response.getWriter().write("{\"error\": \"Erro na autenticação: " + e.getMessage() + "\"}");
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+
         }
 
         liberacaoCors(response);
-        return null;
-    }
-
-    public static Principal getPrincipalFromToken(String token) {
-        try {
-            SecretKeySpec secretKey = createSecretKey();
-
-            String username = Jwts.parserBuilder()
-                    .setSigningKey(secretKey)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .getSubject();
-
-            if (username != null) {
-                Usuario usuario = ApplicationContextLoad.getApplicationContext()
-                        .getBean(UsuarioRepository.class)
-                        .findUserByLogin(username);
-
-                if (usuario != null && token.equalsIgnoreCase(usuario.getToken())) {
-                    return () -> usuario.getLogin();
-                }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
         return null;
     }
 

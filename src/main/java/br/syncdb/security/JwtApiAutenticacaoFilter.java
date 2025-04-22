@@ -26,8 +26,7 @@ public class JwtApiAutenticacaoFilter  extends GenericFilterBean{
         {
             
             // Se não houver autenticação, tenta autenticar com JWT
-            Authentication authentication = new JWTTokenAutenticacaoService()
-                    .getAuthentication((HttpServletRequest) request, (HttpServletResponse) response);
+            Authentication authentication = new JWTTokenAutenticacaoService().getAuthentication((HttpServletRequest) request, (HttpServletResponse) response);
 
             // Define a autenticação no contexto do Spring Security, se for válida
             if (authentication != null) {

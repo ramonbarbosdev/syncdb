@@ -85,8 +85,12 @@ public class EstruturaService {
         }
         finally
         {
-            ConexaoBanco.fecharConexao( database,  TipoConexao.CLOUD);
-            ConexaoBanco.fecharConexao( database,  TipoConexao.LOCAL);
+            if (conexaoCloud != null) {
+                try { conexaoCloud.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
+            if (conexaoLocal != null) {
+                try { conexaoLocal.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
 
         return response;
@@ -124,7 +128,10 @@ public class EstruturaService {
         }
         finally
         {
-            ConexaoBanco.fecharConexao( database,  TipoConexao.LOCAL);
+            if (conexaoLocal != null)
+            {
+                try { conexaoLocal.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
 
         return response; 
