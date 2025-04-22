@@ -13,5 +13,6 @@ import jakarta.transaction.Transactional;
 @Transactional
 public interface  ConexaoRepository extends CrudRepository<Conexao, Long>  {
 
-	
+	@Query("select c from Conexao c  order by  1 asc limit 1")
+	Conexao buscarConexaoPorOrdem();
 }

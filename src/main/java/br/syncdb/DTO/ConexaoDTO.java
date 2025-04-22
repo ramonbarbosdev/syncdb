@@ -2,6 +2,7 @@ package br.syncdb.DTO;
 
 public class ConexaoDTO
 {
+    private Long id_conexao;
     private CloudConnection cloud;
     private LocalConnection local;
     
@@ -16,6 +17,13 @@ public class ConexaoDTO
    }
    public void setLocal(LocalConnection local) {
        this.local = local;
+   }
+
+   public Long getId_conexao() {
+       return id_conexao;
+   }
+   public void setId_conexao(Long id_conexao) {
+       this.id_conexao = id_conexao;
    }
 
     public static class CloudConnection
