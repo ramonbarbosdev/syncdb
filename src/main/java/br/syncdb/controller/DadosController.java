@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.UsuarioDTO;
+import br.syncdb.model.Conexao;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
 import br.syncdb.service.DadosService;
@@ -55,12 +56,11 @@ public class DadosController
 
 		if ((Boolean) resultado.get("sucesso"))
 		{
-			return ResponseEntity.ok(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
 		}
 		else
 		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
 		}
 	}
 	 
@@ -71,12 +71,12 @@ public class DadosController
 
 		if ((Boolean) resultado.get("sucesso"))
 		{
-			return ResponseEntity.ok(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
+											
 		}
 		else
 		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
 		}
 	}
  
@@ -87,12 +87,12 @@ public class DadosController
 
 		if ((Boolean) resultado.get("sucesso"))
 		{
-			return ResponseEntity.ok(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
+											
 		}
 		else
 		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
 		}
 	}
 	

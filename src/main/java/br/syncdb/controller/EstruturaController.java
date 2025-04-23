@@ -29,12 +29,11 @@ public class EstruturaController {
 
 		if ((Boolean) resultado.get("sucesso"))
 		{
-			return ResponseEntity.ok(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
 		}
 		else
 		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
 		}
 
 	}
@@ -46,12 +45,11 @@ public class EstruturaController {
 
 		if ((Boolean) resultado.get("sucesso"))
 		{
-			return ResponseEntity.ok(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
 		}
 		else
 		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-							   .body(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
 		}
 
 	}
@@ -63,11 +61,11 @@ public class EstruturaController {
 
 		if ((Boolean) resultado.get("sucesso"))
 		{
-			return ResponseEntity.ok(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
 		}
 		else
 		{
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(resultado);
+			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
 		}
 
 	}

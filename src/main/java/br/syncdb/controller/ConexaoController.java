@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.ConexaoDTO;
 import br.syncdb.model.Conexao;
+import br.syncdb.model.Usuario;
 import br.syncdb.repository.ConexaoRepository;
 
 @RestController
@@ -41,7 +42,7 @@ public class ConexaoController
 
         repository.save(conexaoModel);
 
-       return ResponseEntity.status(HttpStatus.CREATED).body("{\"sucesso\": \"Conexao criada com sucesso!\"}");
+        return new ResponseEntity<Conexao>(conexaoModel, HttpStatus.OK);
     }
 
     @PutMapping(value = "/", produces = "application/json")
@@ -67,7 +68,7 @@ public class ConexaoController
 
         repository.save(conexaoModel);
 
-       return ResponseEntity.status(HttpStatus.OK).body("{\"sucesso\": \"Conexao criada com sucesso!\"}");
+        return new ResponseEntity<Conexao>(conexaoModel, HttpStatus.OK);
     }
 
 

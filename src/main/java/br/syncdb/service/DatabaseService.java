@@ -75,9 +75,9 @@ public class DatabaseService
         List<String> listar = new ArrayList<>();
         if(database == null) return null;
 
-        try
+        try(Connection conexao = ConexaoBanco.abrirConexao(database, tipo);)
         {
-            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
+            
 
             StringBuilder query = new StringBuilder(
                 "select  distinct  table_schema FROM information_schema.tables where table_schema  not in  ('pg_catalog', 'information_schema')"
@@ -109,10 +109,6 @@ public class DatabaseService
         {
             System.out.println(e.getMessage());
         }
-        finally
-        {
-            ConexaoBanco.fecharConexao( database, tipo);
-        }
             
         return listar;
     }
@@ -121,10 +117,8 @@ public class DatabaseService
         List<String> listar = new ArrayList<>();
         if(database == null) return null;
 
-        try
+        try(Connection conexao = ConexaoBanco.abrirConexao(database, tipo);)
         {
-            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
-
             StringBuilder query = new StringBuilder(
                 "SELECT nspname  FROM pg_namespace WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')"
             );
@@ -155,10 +149,7 @@ public class DatabaseService
         {
             System.out.println(e.getMessage());
         }
-        finally
-        {
-            ConexaoBanco.fecharConexao( database, tipo);
-        }   
+        
         return listar;
     }
     public List<String> obterBanco(String database, String esquema,  TipoConexao  tipo) 
@@ -166,9 +157,8 @@ public class DatabaseService
         List<String> listar = new ArrayList<>();
         if(database == null) return null;
 
-        try
+        try(Connection conexao = ConexaoBanco.abrirConexao(database, tipo);)
         {
-            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
 
             StringBuilder query = new StringBuilder(
                 "SELECT table_schema, table_name FROM information_schema.tables " +
@@ -185,7 +175,6 @@ public class DatabaseService
                 stmt.setString(1, esquema);
             }
     
-
             ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
@@ -199,10 +188,7 @@ public class DatabaseService
         {
             System.out.println(e.getMessage());
         }
-        finally
-        {
-            ConexaoBanco.fecharConexao( database, tipo);
-        }         
+                
         return listar;
     }
    
@@ -210,10 +196,8 @@ public class DatabaseService
 
     public boolean verificarTabelaExistente( String database, TipoConexao tipo, String tabelaNome) throws SQLException
     {
-
-        try
+        try(  Connection conexao = ConexaoBanco.abrirConexao(database, tipo);)
         {
-            Connection conexao = ConexaoBanco.abrirConexao(database, tipo);
 
             String query = "SELECT EXISTS (" +
                         "SELECT 1 " +
@@ -230,13 +214,11 @@ public class DatabaseService
                 return rs.getBoolean(1); 
                 }
 
-        } catch (Exception e) {
-            // TODO: handle exception
-        }
-        finally
+        } catch (Exception e)
         {
-            ConexaoBanco.fecharConexao( database, tipo);
+            e.getMessage();
         }
+       
        
         return false; 
     }
@@ -573,7 +555,9 @@ public class DatabaseService
     {
         try
         {
-            if( conexao == null) return null;
+            if (conexao == null || conexao.isClosed()) {
+                throw new IllegalStateException("Conexão inválida ou já fechada.");
+            }
 
             DatabaseMetaData conexaoMetaData = conexao.getMetaData();
             ResultSet tabelas = conexaoMetaData.getTables(null, null, "%", new String[] {"TABLE"});
