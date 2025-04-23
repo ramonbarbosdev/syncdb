@@ -487,6 +487,7 @@ public class DatabaseService
             String columnName = foreignKeyResultSet.getString("FKCOLUMN_NAME");
             String foreignTableName = foreignKeyResultSet.getString("PKTABLE_NAME");
             String foreignColumnName = foreignKeyResultSet.getString("PKCOLUMN_NAME");
+            String foreignTableSchema = foreignKeyResultSet.getString("PKTABLE_SCHEM");
     
             if (constraintName != null && columnName != null && foreignTableName != null && foreignColumnName != null) {
 
@@ -495,7 +496,7 @@ public class DatabaseService
                 createForeignKeyScript.append("ALTER TABLE ").append(nomeTabela)
                                       .append(" ADD CONSTRAINT ").append(constraintName)
                                       .append(" FOREIGN KEY (").append(columnName).append(")")
-                                      .append(" REFERENCES ").append(foreignTableName)
+                                      .append(" REFERENCES ").append(foreignTableSchema).append(".").append(foreignTableName)
                                       .append(" (").append(foreignColumnName).append(");\n");
                                     //   .append(" ON DELETE CASCADE ON UPDATE CASCADE;\n");
             }

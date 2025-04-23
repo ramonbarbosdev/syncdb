@@ -128,6 +128,11 @@ public class OperacaoBancoService
         if (queries == null || queries.isEmpty()) return;
 
         System.out.println("\n=== Executando grupo: " + tipo + " ===");
+
+        if(tipo.contains("Chaves Estrangeiras"))
+        {
+            System.out.println(tipo);
+        }
     
         for (String query : queries)
         {
