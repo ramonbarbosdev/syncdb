@@ -384,6 +384,8 @@ public class DatabaseService
 
     public  String  criarSequenciaQuery(Connection conexaoCloud, Connection conexaoLocal, String esquema)  throws SQLException
     {
+        //SELECT last_value  FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'alteracao_orcamentaria_id_alteracaoorcamentaria_seq';
+
         StringBuilder createTableScript = new StringBuilder();
         try 
         {

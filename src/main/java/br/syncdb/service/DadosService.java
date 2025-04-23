@@ -511,8 +511,6 @@ public class DadosService
         AtomicInteger tabelasProcessadas = new AtomicInteger(0);
         processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
         
-        // if(tabelas.size() == 0)  throw new SQLException("Tabela "+tabela+" não encontrada.");
-        
         for(String itemTabela : tabelas)
         {    
 
@@ -526,8 +524,7 @@ public class DadosService
             {
                 TabelaDetalhe infoDetalhe = new TabelaDetalhe();
 
-              
-
+               
                 if ((Boolean) parametros.get("novo"))
                 {
                     System.out.println("Criacao da script da '"+itemTabela+"'.");
@@ -553,7 +550,8 @@ public class DadosService
                         detalhes.add(infoDetalhe);
                         criacaoAtualizacaoSeq.add(querySeq);
                     }
-                  
+    
+                            
                 } 
                 else if ((Boolean) parametros.get("existente"))
                 {
@@ -585,9 +583,9 @@ public class DadosService
         processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
-        queries.put("Sequencia", criacaoAtualizacaoSeq);
         queries.put("Criacao", criacaoDados);
         queries.put("Atualizacao", atualizacaoDados);
+        queries.put("Sequencia", criacaoAtualizacaoSeq);
         
         return queries;    
     }
@@ -712,7 +710,7 @@ public class DadosService
     
         String query = String.format(
             "SELECT setval('%s', " +
-            "COALESCE((SELECT MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END) FROM %s), 1) +1, false);",
+            "COALESCE((SELECT MAX(CASE WHEN %s::TEXT ~ '^[0-9]+$' THEN %s::BIGINT ELSE NULL END) FROM %s), 1), true);",
             seq, pkColumn, pkColumn, nomeTabela);
 
         return query;
