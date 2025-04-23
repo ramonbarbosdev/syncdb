@@ -591,16 +591,13 @@ public class DadosService
     }
   
 
-    public  List<String> verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException 
+    public List<String> verificarConsistenciaRegistros(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException 
     {
-        Long id;
-
-        Map<String,  List<String>> resutadoQuery = new LinkedHashMap<>(); 
-        resutadoQuery.put("delete", new ArrayList<>());
-        resutadoQuery.put("insert", new ArrayList<>());
+        Map<String, List<String>> resultadoQuery = new LinkedHashMap<>();
+        resultadoQuery.put("delete", new ArrayList<>());
+        resultadoQuery.put("insert", new ArrayList<>());
 
         List<String> sqlCache = new ArrayList<>();
-
 
         DSLContext createLocal = DSL.using(conexaoLocal, SQLDialect.POSTGRES);
         DSLContext createCloud = DSL.using(conexaoCloud, SQLDialect.POSTGRES);
@@ -608,57 +605,45 @@ public class DadosService
         Set<Long> registrosLocal = new HashSet<>();
         Set<Long> registrosCloud = new HashSet<>();
 
-        Result<Record1<Object>>  sqlLocal = createLocal
-                          .select(DSL.field(pkColumn))
-                          .from(DSL.table(tabela))
-                          .fetch();
+        Result<Record1<Object>> sqlLocal = createLocal
+                        .select(DSL.field(pkColumn))
+                        .from(DSL.table(tabela))
+                        .fetch();
 
         Result<Record1<Object>> sqlCloud = createCloud
-                                            .select(DSL.field(pkColumn))
-                                            .from(DSL.table(tabela))
-                                            .fetch();
+                        .select(DSL.field(pkColumn))
+                        .from(DSL.table(tabela))
+                        .fetch();
 
-        if(sqlLocal == null || sqlCloud == null)
-        {
-            return null ;
+        if (sqlLocal == null || sqlCloud == null) {
+            return null;
         }
-        
-        for (Record1<Object> local : sqlLocal)
-        {
+
+        for (Record1<Object> local : sqlLocal) {
             registrosLocal.add(((Number) local.getValue(pkColumn)).longValue());
         }
 
-        for(Record1<Object> cloud : sqlCloud)
-        {
+        for (Record1<Object> cloud : sqlCloud) {
             registrosCloud.add(((Number) cloud.getValue(pkColumn)).longValue());
         }
 
         Set<Long> registrosDesconhecidos = new HashSet<>(registrosLocal);
         registrosDesconhecidos.removeAll(registrosCloud);
-            
-        if (!registrosDesconhecidos.isEmpty())
-        {
-            // System.out.println("Registros desconhecido na base de dados remota, ID: " + registrosDesconhecidos);
-            id = registrosDesconhecidos.iterator().next() ;
-            resutadoQuery.put("delete", operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
-            sqlCache.addAll( operacaoBancoService.registroDesconhecido( conexaoLocal,  tabela, id,  pkColumn ));
 
+        for (Long idDesconhecido : registrosDesconhecidos) {
+            sqlCache.addAll(operacaoBancoService.registroDesconhecido(conexaoLocal, tabela, idDesconhecido, pkColumn));
         }
-        
+
         Set<Long> registrosExtras = new HashSet<>(registrosCloud);
         registrosExtras.removeAll(registrosLocal);
-        
-        if (!registrosExtras.isEmpty())
-        {
-            // System.out.println("Registros extras na base de dados remota, ID: " + registrosExtras);
-            id = registrosExtras.iterator().next() ;
-            sqlCache.addAll(operacaoBancoService.registroExtra( conexaoLocal, conexaoCloud, tabela, id,  pkColumn ));
 
+        for (Long idExtra : registrosExtras) {
+            sqlCache.addAll(operacaoBancoService.registroExtra(conexaoLocal, conexaoCloud, tabela, idExtra, pkColumn));
         }
-        
+
         return sqlCache;
-     
     }
+
 
     public void verificarConsistenciaDados(Connection conexaoLocal, Connection conexaoCloud, String tabela, String pkColumn) throws SQLException {
         // 1. Obtenha os registros das duas bases de dados

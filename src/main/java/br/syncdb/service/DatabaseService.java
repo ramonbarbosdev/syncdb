@@ -34,15 +34,15 @@ import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
 import br.syncdb.model.TableMetadata;
 import br.syncdb.utils.DicionarioTipoSql;
+import br.syncdb.utils.UtilsSync;
 
 
 @Service
 public class DatabaseService  
 {
     
-    // @Autowired
-    // @Qualifier("cloudDataSource")
-    // private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private UtilsSync utilsSync;
 
     public List<String> listarBases(String database, TipoConexao  tipo)
     {
@@ -270,8 +270,8 @@ public class DatabaseService
         StringBuilder createTableScript = new StringBuilder();
         boolean needsUuidOssp = false;
     
-        String schema = "public";
-        String nomeTabela = nomeTabelaCompleto;
+        String schema =  utilsSync.extrairSchema(nomeTabelaCompleto);
+        String nomeTabela =  utilsSync.extrairTabela(nomeTabelaCompleto);
     
         if (nomeTabelaCompleto.contains("."))
         {
@@ -293,7 +293,7 @@ public class DatabaseService
                 String colName = rs.getString("column_name");
                 String rawDefault = rs.getString("column_default");
                 String clean = rawDefault.replace("::regclass", "").replace("nextval(", "").replace("'", "").replace(")", "").trim();
-                String seqDef = "nextval('" + clean + "'::regclass)"; // <-- aqui corrigido para manter o schema
+                String seqDef = "nextval('" + clean + "'::regclass)"; 
                 serialColumns.put(colName, seqDef);
             }
         }
@@ -491,10 +491,13 @@ public class DatabaseService
 
     public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException
     {
+        String schema = utilsSync.extrairSchema(nomeTabela);
+        String tabela = utilsSync.extrairTabela(nomeTabela);
+        
         StringBuilder createForeignKeyScript = new StringBuilder();
         
         DatabaseMetaData metaData = conexao.getMetaData();
-        ResultSet foreignKeyResultSet = metaData.getImportedKeys(null, "public", nomeTabela);
+        ResultSet foreignKeyResultSet = metaData.getImportedKeys(null, schema, tabela);
     
         while (foreignKeyResultSet.next())
         {
@@ -619,14 +622,7 @@ public class DatabaseService
             throw new RuntimeException(e);
         }
         
-    }
-
-    public TableMetadata obterTodosMetadados(Connection conexao, String nomeTabela) throws SQLException {
-        String estrutura = criarEstuturaTabela(conexao, nomeTabela);
-        String chaves = obterChaveEstrangeira(conexao, nomeTabela);
-        return new TableMetadata(estrutura, chaves);
-    }
-    
+    }    
     public String compararEstruturaTabela(Connection conexaoCloud, Connection conexaoLocal, 
             String nomeTabela) throws SQLException
     {
@@ -642,15 +638,16 @@ public class DatabaseService
         return alteracoes.length() > 0 ?  alteracoes.toString() : null;
     }
 
-    private Map<String, Coluna> obterEstruturaColunas(Connection conexao, String nomeTabela) 
-            throws SQLException
+    private Map<String, Coluna> obterEstruturaColunas(Connection conexao, String nomeTabela) throws SQLException
     {
         
         Map<String, Coluna> estrutura = new HashMap<>();
         DatabaseMetaData metaData = conexao.getMetaData();
-      
+        
+        String schema = utilsSync.extrairSchema(nomeTabela);
+        String tabela = utilsSync.extrairTabela(nomeTabela);
 
-        try (ResultSet colunas = metaData.getColumns(null, "public", nomeTabela, null))
+        try (ResultSet colunas = metaData.getColumns(null, schema, tabela, null))
         {
             while (colunas.next())
             {
@@ -671,7 +668,6 @@ public class DatabaseService
         return estrutura;
     }
 
-    // Método auxiliar para comparar colunas existentes
     private void compararColunas(StringBuilder alteracoes, String nomeTabela,
             Map<String, Coluna> estruturaCloud, Map<String, Coluna> estruturaLocal)
     {
