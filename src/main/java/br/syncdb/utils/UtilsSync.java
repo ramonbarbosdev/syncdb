@@ -20,7 +20,8 @@ public class UtilsSync {
     }
 
     public void  tratarErroSincronizacao(Map<String, Object> response, Exception e)
-    {        
+    { 
+        System.out.println("Erro durante sincronização: " + e.getMessage());       
         String errorType = e.getClass().getSimpleName();
         String details = e.getMessage();
 

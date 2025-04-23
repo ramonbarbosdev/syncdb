@@ -74,6 +74,10 @@ public class EstruturaService {
             response.put("tabelas_afetadas", detalhes); 
             response.put("sucesso", true); 
         }
+        catch (SQLException e)
+        {
+            utilsSync.tratarErroSincronizacao(response, e);
+        }
         catch (Exception e)
         {
             utilsSync.tratarErroSincronizacao(response, e);
@@ -105,6 +109,10 @@ public class EstruturaService {
             response.put("tabelas_afetadas", detalhes); 
             response.put("mensagem", "Estrutura Sincronizada.");
         
+        }
+        catch (SQLException e)
+        {
+            utilsSync.tratarErroSincronizacao(response, e);
         }
         catch (Exception e)
         {

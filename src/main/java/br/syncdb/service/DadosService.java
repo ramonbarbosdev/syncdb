@@ -76,6 +76,10 @@ public class DadosService
             response.put("tabelas_afetadas", detalhes); 
 
         }
+        catch (SQLException e)
+        {
+            utilsSync.tratarErroSincronizacao(response, e);
+        }
         catch (Exception e)
         {
             utilsSync.tratarErroSincronizacao(response, e);
@@ -112,6 +116,10 @@ public class DadosService
 
             ativarConstraints(conexaoLocal);
 
+        }
+        catch (SQLException e)
+        {
+            utilsSync.tratarErroSincronizacao(response, e);
         }
         catch (Exception e)
         {
