@@ -63,6 +63,22 @@ public class DadosController
 							   .body(resultado);
 		}
 	}
+	 
+	@GetMapping(value = "/verificar/{base}/{esquema}/{tabela}", produces = "application/json")
+	public ResponseEntity<?> verificarDadosTabela (@PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema,  @PathVariable (value = "tabela") String tabela ) 
+	{
+		Map<String, Object>  resultado = dadosService.verificarDados(base,  tabela);
+
+		if ((Boolean) resultado.get("sucesso"))
+		{
+			return ResponseEntity.ok(resultado);
+		}
+		else
+		{
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+							   .body(resultado);
+		}
+	}
  
     @GetMapping(value = "/{base}", produces = "application/json")
 	public ResponseEntity<?> sincronizacao ( @PathVariable (value = "base") String base ) 
