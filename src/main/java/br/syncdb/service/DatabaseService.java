@@ -147,9 +147,10 @@ public class DatabaseService
         }
         catch (Exception e)
         {
-            System.out.println(e.getMessage());
+            throw new RuntimeException(e.getMessage());
         }
         
+        if (listar.isEmpty())  throw new RuntimeException("Não existe esquema com o nome: " + esquema);
         return listar;
     }
     public List<String> obterBanco(String database, String esquema,  TipoConexao  tipo) 
@@ -186,7 +187,7 @@ public class DatabaseService
         }
         catch (Exception e)
         {
-            System.out.println(e.getMessage());
+            throw new RuntimeException(e.getMessage());
         }
                 
         return listar;
@@ -216,7 +217,7 @@ public class DatabaseService
 
         } catch (Exception e)
         {
-            e.getMessage();
+            throw new RuntimeException(e.getMessage());
         }
        
        
@@ -395,7 +396,7 @@ public class DatabaseService
         }
         catch(Exception e)
         {
-            System.out.println(e);
+            throw new RuntimeException(e.getMessage());
         }
 
         return createTableScript.length() > 0 ?  createTableScript.toString() : null;
@@ -577,7 +578,7 @@ public class DatabaseService
         }
         catch (SQLException e)
         {
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.getMessage());
         }
         
     }
@@ -604,7 +605,7 @@ public class DatabaseService
         }
         catch (SQLException e)
         {
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.getMessage());
         }
         
     }    

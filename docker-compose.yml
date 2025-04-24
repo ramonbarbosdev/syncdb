@@ -3,7 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ramonbarbosdev/syncdb:latest
+    # image: ramonbarbosdev/syncdb:latest
+    image: syncdb:latest
     container_name: backend-syncdb
     ports:
       - "8080:8080"
@@ -17,3 +18,4 @@ services:
 networks:
   backend-network:
     external: true
+

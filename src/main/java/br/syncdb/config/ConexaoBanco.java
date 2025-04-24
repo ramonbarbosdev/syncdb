@@ -121,7 +121,12 @@ public class ConexaoBanco {
         String user = ConfiguracaoBanco.get("spring.datasource.username");
         String password = ConfiguracaoBanco.get("spring.datasource.password");
         String url = ConfiguracaoBanco.get("spring.datasource.url");
-        
+        // String url = "jdbc:postgresql://postgres-db:5432/syncdb";
+
+      System.out.println(url);
+      System.out.println(password);
+      System.out.println(user);
+
         try( Connection conexao = DriverManager.getConnection(  url, user,password);)
         {   
             StringBuilder query = new StringBuilder();

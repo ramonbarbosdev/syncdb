@@ -1,8 +1,10 @@
 package br.syncdb.controller;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.postgresql.util.PSQLException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,11 +54,14 @@ public class SincronizacaoController
     @GetMapping(value = "/verificaesquema/{base}/{esquema}", produces = "application/json")
 	public ResponseEntity<?> verificarExistenciaEsquema ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema     ) 
 	{
-		List<String> esquemas = databaseService.obterSchemaUnico(base, esquema,TipoConexao.LOCAL);
+		List<String> esquemas = databaseService.obterSchemaUnico(base, esquema, TipoConexao.LOCAL);
 
-		if(!esquemas.isEmpty())  return new ResponseEntity<List<String>>(esquemas, HttpStatus.OK);
+		if (!esquemas.isEmpty())
+		{
+			return new ResponseEntity<>(esquemas, HttpStatus.OK);
+		}
 
-		return new ResponseEntity<List<String>>(esquemas, HttpStatus.NOT_FOUND);
+		return new ResponseEntity<>(esquemas, HttpStatus.NOT_FOUND);
 	}
 
 	
