@@ -25,12 +25,9 @@ public class SincronizacaoController
 	{
 		List<String> bases = databaseService.listarBases("w5i_tecnologia", TipoConexao.CLOUD);
 
-		if(!bases.isEmpty())
-		{
-			return ResponseEntity.ok(bases);
-		}
+		if(!bases.isEmpty()) return new ResponseEntity<List<String>>(bases, HttpStatus.OK);
 
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Base informada não existe.\"}");
+		return new ResponseEntity<List<String>>(bases, HttpStatus.NOT_FOUND);
 	}
 
 	@GetMapping(value = "/base/esquema/{base}", produces = "application/json")
@@ -38,18 +35,18 @@ public class SincronizacaoController
 	{
 		List<String> esquema = databaseService.obterSchema(base, null,TipoConexao.CLOUD);
 
-		if(!esquema.isEmpty()) return ResponseEntity.ok(esquema);
+		if(!esquema.isEmpty()) 	return new ResponseEntity<List<String>>(esquema, HttpStatus.OK);
 
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Não existe esquema para ser visualizado.\"}");
+		return new ResponseEntity<List<String>>(esquema, HttpStatus.NOT_FOUND);
 	}
 	@GetMapping(value = "/base/tabela/{base}/{esquema}", produces = "application/json")
 	public ResponseEntity<?> obterTabelaBase ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema     ) 
 	{
 		List<String> tabelas = databaseService.obterBanco(base,esquema, TipoConexao.CLOUD);
 
-		if(!tabelas.isEmpty()) return ResponseEntity.ok(tabelas);
+		if(!tabelas.isEmpty()) return new ResponseEntity<List<String>>(tabelas, HttpStatus.OK);
 
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"Tabela informada não existe\"}");
+		return new ResponseEntity<List<String>>(tabelas, HttpStatus.NOT_FOUND);
 	}
 
     @GetMapping(value = "/verificaesquema/{base}/{esquema}", produces = "application/json")
@@ -57,9 +54,9 @@ public class SincronizacaoController
 	{
 		List<String> esquemas = databaseService.obterSchemaUnico(base, esquema,TipoConexao.LOCAL);
 
-		if(!esquemas.isEmpty()) return ResponseEntity.ok(esquemas);
+		if(!esquemas.isEmpty())  return new ResponseEntity<List<String>>(esquemas, HttpStatus.OK);
 
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"erro\": \"O Esquema '"+esquema+"'' não existe no banco de dados local.\"}");
+		return new ResponseEntity<List<String>>(esquemas, HttpStatus.NOT_FOUND);
 	}
 
 	
