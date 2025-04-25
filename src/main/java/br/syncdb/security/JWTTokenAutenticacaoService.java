@@ -39,7 +39,7 @@ public class JWTTokenAutenticacaoService {
         return new SecretKeySpec(decodedKey, "HmacSHA512");
     }
 
-    public void addAuthentication(HttpServletResponse response, String username) throws Exception {
+    public String addAuthentication(HttpServletResponse response, String username) throws Exception {
         SecretKeySpec secretKey = createSecretKey();
 
         String jwt = Jwts.builder()
@@ -58,8 +58,9 @@ public class JWTTokenAutenticacaoService {
         inserirJwtCookie(jwt, response);
         liberacaoCors(response);
 
-        response.setContentType("application/json");
-        response.getWriter().write("{\"Authorization\": \"" + token + "\"}");
+        // response.setContentType("application/json");
+        // response.getWriter().write("{\"Authorization\": \"" + token + "\"}");
+        return token;
     }
 
     public Authentication getAuthentication(HttpServletRequest request, HttpServletResponse response)

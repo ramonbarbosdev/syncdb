@@ -66,9 +66,7 @@ public class UsuarioController {
 	
 	@PostMapping(value="/" , produces = "application/json")
 	public ResponseEntity<Usuario> cadastrar(@RequestBody Usuario usuario)
-	{
-		
-		
+	{	
 		String senhacriptografada = new BCryptPasswordEncoder().encode(usuario.getSenha());
 		usuario.setSenha(senhacriptografada);
 		Usuario usuarioSalvo = usuarioRepository.save(usuario);
@@ -79,9 +77,6 @@ public class UsuarioController {
 	@PutMapping(value="/" , produces = "application/json")
 	public ResponseEntity<?> atualizar(@RequestBody Usuario usuario)
 	{
-		
-		
-	
 		Usuario userTemporario = usuarioRepository.findUserByLogin(usuario.getLogin());
 		
 		if (userTemporario == null)
