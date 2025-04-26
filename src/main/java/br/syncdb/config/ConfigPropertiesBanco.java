@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-public class ConfiguracaoBanco {
+public class ConfigPropertiesBanco {
 
     private static final Properties properties = new Properties();
 
@@ -16,7 +16,7 @@ public class ConfiguracaoBanco {
     {
         String perfil = "dev"; 
 
-        try (InputStream baseInput = ConfiguracaoBanco.class.getClassLoader().getResourceAsStream("application.properties")) {
+        try (InputStream baseInput = ConfigPropertiesBanco.class.getClassLoader().getResourceAsStream("application.properties")) {
             if (baseInput != null)
             {
                 Properties baseProps = new Properties();
@@ -41,7 +41,7 @@ public class ConfiguracaoBanco {
         }
 
         String nomeArquivo = "application-" + perfil + ".properties";
-        try (InputStream input = ConfiguracaoBanco.class.getClassLoader().getResourceAsStream(nomeArquivo))
+        try (InputStream input = ConfigPropertiesBanco.class.getClassLoader().getResourceAsStream(nomeArquivo))
         {
             if (input == null)
             {

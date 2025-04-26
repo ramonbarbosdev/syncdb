@@ -143,6 +143,14 @@
 			<version>5.7.0</version> <!-- Use a versão compatível com seu projeto -->
 		</dependency>
 		<!--websocket-->
+
+		<!-- Env -->
+		<dependency>
+			<groupId>io.github.cdimascio</groupId>
+			<artifactId>java-dotenv</artifactId>
+			<version>5.2.2</version>
+		</dependency>
+		<!-- Env -->
 	
 	
 	</dependencies>

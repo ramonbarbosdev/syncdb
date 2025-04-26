@@ -1,5 +1,6 @@
 package br.syncdb.service;
 
+import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -29,7 +30,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 
 import br.syncdb.config.ConexaoBanco;
-import br.syncdb.config.DatabaseConnection;
 import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
 import br.syncdb.model.TableMetadata;
@@ -62,7 +62,12 @@ public class DatabaseService
         }
         catch (SQLException e)
         {
+            e.printStackTrace(); 
             throw new RuntimeException("Erro ao listar bases: " + e.getMessage(), e);
+        } catch (Exception e) {
+            System.out.println("Erro inesperado: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro inesperado ao listar bases: " + e.getMessage(), e);
         }
         
       

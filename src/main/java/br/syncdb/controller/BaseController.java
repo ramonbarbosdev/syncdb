@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import br.syncdb.config.RelacionamentoConfig;
 import br.syncdb.excecoes.MensagemException;
 
 

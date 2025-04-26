@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import br.syncdb.controller.TipoConexao;
+import io.github.cdimascio.dotenv.Dotenv;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -15,6 +16,19 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ConexaoBanco {
+
+    private static final Dotenv dotenv;
+
+    static {
+        try {
+            dotenv = Dotenv.configure()
+                            .directory("./.env")  
+                            .load();
+                            
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError("Erro ao carregar o arquivo .env: " + e.getMessage());
+        }
+    }
 
 
     private static final Map<String, HikariDataSource> dataSourceMap = new ConcurrentHashMap<>();
@@ -33,23 +47,20 @@ public class ConexaoBanco {
     }
 
    
-    public static Connection abrirConexao(String database, TipoConexao tipo) throws SQLException {
-        
-        Map<String, String> dados = buscarDadosConexao(tipo);
+    public static Connection abrirConexao(String database, TipoConexao tipo) throws SQLException
+    {
+        validacaoConecao(database, tipo);
 
-        if (dados == null) throw new SQLException("Falha ao buscar dados da conexão para: " + tipo);
-        
-        String host = dados.get("host");
-        String port = dados.get("port");
-        String user = dados.get("user");
-        String password = dados.get("password");
+        String host = dotenv.get("DATABASE_" +tipo+ "_HOST");
+        String port = dotenv.get("DATABASE_" +tipo+ "_PORT");
+        String user = dotenv.get("DATABASE_" +tipo+ "_USER");
+        String password  = dotenv.get("DATABASE_" +tipo+ "_PASS");
 
         String chave = database + "_" + tipo.name(); 
     
         HikariDataSource dataSource = dataSourceMap.get(chave);
         if (dataSource == null)
         {
-            System.err.println("Nova Conexao: "+database);
             synchronized (ConexaoBanco.class) {
                 dataSource = dataSourceMap.get(chave);
                 if (dataSource == null) {
@@ -58,12 +69,44 @@ public class ConexaoBanco {
                 }
             }
         }
-        else
-        {
-            System.err.println("Conexao existente: "+database);
-        }
         
         return dataSource.getConnection();
+    }
+
+    public static void validacaoConecao(String database, TipoConexao tipo) throws SQLException
+    {
+        if (database == null || database.isEmpty())
+        {
+            throw new IllegalArgumentException("O nome do banco de dados não pode ser nulo ou vazio.");
+        }
+        if (tipo == null)
+        {
+            throw new IllegalArgumentException("O tipo de conexão não pode ser nulo.");
+        }
+
+        if (dotenv.get("DATABASE_" + tipo + "_HOST") == null || dotenv.get("DATABASE_" + tipo + "_HOST").isEmpty()) {
+            throw new IllegalArgumentException("O host do banco de dados não pode ser nulo ou vazio.");
+        }
+        if (dotenv.get("DATABASE_" + tipo + "_PORT") == null || dotenv.get("DATABASE_" + tipo + "_PORT").isEmpty()) {
+            throw new IllegalArgumentException("A porta do banco de dados não pode ser nula ou vazia.");
+        }
+        if (dotenv.get("DATABASE_" + tipo + "_USER") == null || dotenv.get("DATABASE_" + tipo + "_USER").isEmpty()) {
+            throw new IllegalArgumentException("O usuário do banco de dados não pode ser nulo ou vazio.");
+        }
+        if (dotenv.get("DATABASE_" + tipo + "_PASS") == null || dotenv.get("DATABASE_" + tipo + "_PASS").isEmpty()) {
+            throw new IllegalArgumentException("A senha do banco de dados não pode ser nula ou vazia.");
+        }
+        String chave = database + "_" + tipo.name(); 
+    
+        HikariDataSource dataSource = dataSourceMap.get(chave);
+        if (dataSource != null && !dataSource.isClosed())
+        {
+            System.out.println("Pool de conexão já existe para o banco: " + chave);
+        }
+        else
+        {
+            System.out.println("Nenhum pool encontrado para o banco: " + chave);
+        }
     }
 
     public static void fecharConexao(String database, TipoConexao tipo) {
@@ -90,16 +133,13 @@ public class ConexaoBanco {
             else
             {
                 System.out.println("Pool já estava fechado para o banco: " + chave);
-                dataSourceMap.remove(chave); // limpa do mapa mesmo assim
+                dataSourceMap.remove(chave); 
             }
         } else {
             System.out.println("Nenhum pool encontrado para o banco: " + chave);
         }
     }
-    
-    
 
-    // Método para fechar todos os pools de conexão
     public static void fecharTodos()
     {
         for (Map.Entry<String, HikariDataSource> entry : dataSourceMap.entrySet())
@@ -118,14 +158,9 @@ public class ConexaoBanco {
     public static Map<String, String>  buscarDadosConexao( TipoConexao tipo) 
     {
     
-        String user = ConfiguracaoBanco.get("spring.datasource.username");
-        String password = ConfiguracaoBanco.get("spring.datasource.password");
-        String url = ConfiguracaoBanco.get("spring.datasource.url");
-        // String url = "jdbc:postgresql://postgres-db:5432/syncdb";
-
-      System.out.println(url);
-      System.out.println(password);
-      System.out.println(user);
+        String user = ConfigPropertiesBanco.get("spring.datasource.username");
+        String password = ConfigPropertiesBanco.get("spring.datasource.password");
+        String url = ConfigPropertiesBanco.get("spring.datasource.url");
 
         try( Connection conexao = DriverManager.getConnection(  url, user,password);)
         {   
