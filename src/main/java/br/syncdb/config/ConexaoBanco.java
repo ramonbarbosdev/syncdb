@@ -25,6 +25,8 @@ public class ConexaoBanco {
                             .directory("./.env")  
                             .load();
                             
+        
+                            
         } catch (Exception e) {
             throw new ExceptionInInitializerError("Erro ao carregar o arquivo .env: " + e.getMessage());
         }
@@ -49,12 +51,31 @@ public class ConexaoBanco {
    
     public static Connection abrirConexao(String database, TipoConexao tipo) throws SQLException
     {
+        String host = "";
+        String port = "";
+        String user = "";
+        String password = "";
+
         validacaoConecao(database, tipo);
 
-        String host = dotenv.get("DATABASE_" +tipo+ "_HOST");
-        String port = dotenv.get("DATABASE_" +tipo+ "_PORT");
-        String user = dotenv.get("DATABASE_" +tipo+ "_USER");
-        String password  = dotenv.get("DATABASE_" +tipo+ "_PASS");
+        if(tipo.equals(TipoConexao.LOCAL))
+        {
+            host = ConfigPropertiesBanco.get("spring.datasource.host");
+            port = ConfigPropertiesBanco.get("spring.datasource.port");
+            user = ConfigPropertiesBanco.get("spring.datasource.username");
+            password = ConfigPropertiesBanco.get("spring.datasource.password");
+        }
+        else if(tipo.equals(TipoConexao.CLOUD))
+        {
+            host = dotenv.get("DATABASE_" +tipo+ "_HOST");
+            port = dotenv.get("DATABASE_" +tipo+ "_PORT");
+            user = dotenv.get("DATABASE_" +tipo+ "_USER");
+            password  = dotenv.get("DATABASE_" +tipo+ "_PASS");
+        }
+        else
+        {
+            throw new SQLException("Tipo de conexão inválido: " + tipo);
+        }
 
         String chave = database + "_" + tipo.name(); 
     
@@ -79,10 +100,13 @@ public class ConexaoBanco {
         {
             throw new IllegalArgumentException("O nome do banco de dados não pode ser nulo ou vazio.");
         }
+
         if (tipo == null)
         {
             throw new IllegalArgumentException("O tipo de conexão não pode ser nulo.");
         }
+
+        tipo = TipoConexao.CLOUD;
 
         if (dotenv.get("DATABASE_" + tipo + "_HOST") == null || dotenv.get("DATABASE_" + tipo + "_HOST").isEmpty()) {
             throw new IllegalArgumentException("O host do banco de dados não pode ser nulo ou vazio.");
