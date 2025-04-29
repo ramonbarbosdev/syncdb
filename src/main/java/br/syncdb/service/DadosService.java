@@ -495,7 +495,12 @@ public class DadosService
         return parametros;
     }
 
-    public  HashMap<String, List<String>>  obterDadosTabela(Connection conexaoCloud, Connection conexaoLocal, String tabela, List<TabelaDetalhe> detalhes) throws SQLException
+    public  HashMap<String, List<String>>  obterDadosTabela(
+        Connection conexaoCloud, 
+        Connection conexaoLocal, 
+        String tabela,
+        List<TabelaDetalhe> detalhes
+         ) throws SQLException
     {
 
         Map<String, Object> parametrosMap = carregarOrdemTabela(conexaoCloud, conexaoLocal, tabela);
