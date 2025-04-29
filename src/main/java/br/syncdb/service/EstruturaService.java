@@ -69,9 +69,12 @@ public class EstruturaService {
 
             HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,database, esquema, nomeTabela);
 
-            cacheService.salvarCache(database + "_estrutura:", queries);
-            
-            response.put("tabelas_afetadas", detalhes); 
+            if (queries != null ) 
+            {
+                cacheService.salvarCache(database + "_estrutura:", queries);
+                response.put("tabelas_afetadas", detalhes); 
+            }
+          
             response.put("sucesso", true); 
         }
         catch (SQLException e)
@@ -126,7 +129,7 @@ public class EstruturaService {
     Set<String> tabelasCloud,
     Set<String> nomeTabelaLocal,
     List<EstruturaTabela> detalhes,
-    String base,
+    String database,
     String esquema,
     String nomeTabela
     ) 
@@ -139,6 +142,9 @@ public class EstruturaService {
         List<String> chavesEstrangeiras = Collections.synchronizedList(new ArrayList<>());
         List<String> alteracoes = Collections.synchronizedList(new ArrayList<>());
 
+
+        processoService.iniciarProcesso(database);
+
         int totalTabelas = tabelasCloud.size();
         AtomicInteger tabelasProcessadas = new AtomicInteger(0);
         processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
@@ -150,7 +156,14 @@ public class EstruturaService {
 
         for (String itemTabela : tabelasCloud)
         {
-           
+            //Processamento
+            if (processoService.isCancelado(database))
+            {
+                System.out.println("Operação Cancelada.");
+                processoService.enviarProgresso("Cancelado", 0, "Processamento cancelado pelo usuário", itemTabela);
+                processoService.finalizarProcesso(database);
+                return null;
+            }
             int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
             processoService.enviarProgresso("Processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
 
@@ -202,6 +215,7 @@ public class EstruturaService {
         }
 
         processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
+        processoService.finalizarProcesso(database);
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Schemas", criacaoSchema);

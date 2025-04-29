@@ -44,7 +44,6 @@ public class ProcessoService {
     
     public void enviarProgresso(String status, int progresso, String mensagem, String tabelaAtual)
     {
-        String processoId = UUID.randomUUID().toString();
 
         Map<String, Object> progressoMsg = new HashMap<>();
         progressoMsg.put("status", status);
@@ -52,7 +51,6 @@ public class ProcessoService {
         progressoMsg.put("mensagem", mensagem);
         progressoMsg.put("tabelaAtual", tabelaAtual);
         progressoMsg.put("timestamp", System.currentTimeMillis());
-        progressoMsg.put("idProcesso", processoId); 
 
         messagingTemplate.convertAndSend("/topic/sync/progress", progressoMsg);
     }
