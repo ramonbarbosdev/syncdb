@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -124,10 +125,11 @@ public class EstruturaService {
         return response; 
     }
 
-    public HashMap<String, List<String>>  processarTabelas(Connection conexaoCloud,
+    public HashMap<String, List<String>>  processarTabelas(
+    Connection conexaoCloud,
     Connection conexaoLocal,
     Set<String> tabelasCloud,
-    Set<String> nomeTabelaLocal,
+    Set<String> tabelasLocal,
     List<EstruturaTabela> detalhes,
     String database,
     String esquema,
@@ -141,7 +143,6 @@ public class EstruturaService {
         List<String> criacoesTabela = Collections.synchronizedList(new ArrayList<>());
         List<String> chavesEstrangeiras = Collections.synchronizedList(new ArrayList<>());
         List<String> alteracoes = Collections.synchronizedList(new ArrayList<>());
-
 
         processoService.iniciarProcesso(database);
 
@@ -169,7 +170,7 @@ public class EstruturaService {
 
             EstruturaTabela infoEstrutura = new EstruturaTabela();
             
-            if (!nomeTabelaLocal.contains(itemTabela))
+            if (!tabelasLocal.contains(itemTabela))
             {
                 System.out.println("Criando estrutura da tabela: " + itemTabela);
                 
@@ -229,21 +230,14 @@ public class EstruturaService {
 
     public  Set<String> obterTabelas(Connection conexao, String base, String nomeTabela ) throws InterruptedException, ExecutionException, TimeoutException
     {
-        CompletableFuture<Set<String>> futureCloud = CompletableFuture.supplyAsync
-        (() -> 
-            databaseService.obterTabelaMetaData(base, conexao)
-        );
+        Set<String> tabelas = databaseService.obterTabelaMetaData(base, conexao); // chamado diretamente
 
-        Set<String> tabelas = futureCloud.get(5, TimeUnit.MINUTES);
-
-        if (nomeTabela != null && !nomeTabela.isBlank()) 
-        {
+        if (nomeTabela != null && !nomeTabela.isBlank()) {
             return tabelas.stream()
                     .filter(t -> t.contains(nomeTabela))
                     .collect(Collectors.toSet());
         }
     
-
         return tabelas;
     }
 
