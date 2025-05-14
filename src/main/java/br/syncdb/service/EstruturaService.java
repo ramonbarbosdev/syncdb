@@ -58,33 +58,6 @@ public class EstruturaService {
     @Autowired
     private CacheService cacheService;
 
-    public Map<String, Object> verificarEstruturaCancelavel(String base, String esquema, String tabela) {
-        Map<String, Object> resultado = new HashMap<>();
-
-        for (int i = 0; i < 100; i++) {
-            if (Thread.currentThread().isInterrupted())
-            {
-                resultado.put("sucesso", false);
-                resultado.put("mensagem", "Processo cancelado pelo usuário");
-                return resultado;
-            }
-
-            // Simula um passo de verificação
-            try {
-                Thread.sleep(100); // Simula processamento
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                resultado.put("sucesso", false);
-                resultado.put("mensagem", "Processo interrompido");
-                return resultado;
-            }
-        }
-
-        resultado.put("sucesso", true);
-        resultado.put("mensagem", "Verificação finalizada com sucesso");
-        return resultado;
-    }
-
     public Map<String, Object> verificarEstrutura(String database, String esquema, String nomeTabela)
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
@@ -190,6 +163,9 @@ public class EstruturaService {
         String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal,esquema);
         if (sequenciaQuery != null)  sequencias.add(sequenciaQuery);
 
+        String  funcao = databaseService.criarFuncoesQuery(conexaoCloud, conexaoCloud);
+        funcoes.add(funcao);
+
         for (String itemTabela : tabelasCloud)
         {
             //Processamento
@@ -198,7 +174,7 @@ public class EstruturaService {
             processoService.enviarProgresso("Processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
 
             EstruturaTabela infoEstrutura = new EstruturaTabela();
-            
+ 
             if (!tabelasLocal.contains(itemTabela))
             {
                 System.out.println("Criando estrutura da tabela: " + itemTabela);
@@ -252,6 +228,7 @@ public class EstruturaService {
         queries.put("Criação de Tabelas", criacoesTabela);
         queries.put("Chaves Estrangeiras",chavesEstrangeiras);
         queries.put("Alterações",alteracoes);
+        queries.put("Função",funcoes);
         
         return queries;
     }

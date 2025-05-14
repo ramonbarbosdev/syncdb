@@ -424,56 +424,63 @@ public class DatabaseService
         return false;
     }
 
-    public  String  criarFuncoesQuery(Connection conexao,  Connection conexaoLocal)  throws SQLException
+    public  String  criarFuncoesQuery(Connection conexaoCloud,  Connection conexaoLocal)  throws SQLException
     {
 
-        StringBuilder createTableScript = new StringBuilder();
+        StringBuilder scriptFuncoes = new StringBuilder();
 
-        String queryFuncoes = "SELECT n.nspname AS schema_name, p.proname AS function_name, pg_get_functiondef(p.oid) AS function_definition " +
-                                "FROM pg_proc p " +
-                                "JOIN pg_namespace n ON n.oid = p.pronamespace " +
-                                "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND pg_function_is_visible(p.oid);";
+        String queryFuncoes = """
+            SELECT n.nspname AS schema_name,
+                   p.proname AS function_name,
+                   pg_get_function_identity_arguments(p.oid) AS arguments,
+                   pg_get_functiondef(p.oid) AS function_definition
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND pg_function_is_visible(p.oid);
+            """;
+    
+        try (
+            Statement stmtCloud = conexaoCloud.createStatement();
+            ResultSet rsCloud = stmtCloud.executeQuery(queryFuncoes)
+        ) {
+            while (rsCloud.next()) {
+                String schema = rsCloud.getString("schema_name");
+                String nomeFuncao = rsCloud.getString("function_name");
+                String argumentos = rsCloud.getString("arguments");
+                String definicao = rsCloud.getString("function_definition");
+    
+                scriptFuncoes.append(definicao).append("\n\n");
 
-        try (Statement stmtCloud = conexao.createStatement();
-        ResultSet rsCloud = stmtCloud.executeQuery(queryFuncoes))
-        {
-
-            while (rsCloud.next())
-            {
-                String nomeFuncaoCloud = rsCloud.getString("function_name");
-                String schemaCloud = rsCloud.getString("schema_name");
-                String functionDefinitionCloud = rsCloud.getString("function_definition");
-
-                
-                if (!funcaoExiste(conexaoLocal, schemaCloud, nomeFuncaoCloud)) {
-                    String createFunctionQuery = "CREATE FUNCTION " + schemaCloud + "." + nomeFuncaoCloud + " " + functionDefinitionCloud;
-                    createTableScript.append(createFunctionQuery).append("\n");
-                }
+                // if (!funcaoExiste(conexaoLocal, schema, nomeFuncao, argumentos))
+                // {
+                //     scriptFuncoes.append(definicao).append("\n\n");
+                // }
             }
         }
-
-        return createTableScript.toString();
+    
+        return scriptFuncoes.toString();
     }
 
-    private boolean funcaoExiste(Connection conexao, String schema, String nomeFuncao) throws SQLException {
-        String query = """
-                SELECT COUNT(*) 
-                FROM pg_proc p 
-                JOIN pg_namespace n ON n.oid = p.pronamespace 
-                WHERE n.nspname = ? AND p.proname = ?;
-                """;
+    private boolean funcaoExiste(Connection conexao, String schema, String nomeFuncao, String argumentos) throws SQLException {
+        String sql = """
+            SELECT 1
+            FROM pg_proc p
+            JOIN pg_namespace n ON p.pronamespace = n.oid
+            WHERE n.nspname = ?
+              AND p.proname = ?
+              AND pg_get_function_identity_arguments(p.oid) = ?;
+            """;
     
-        try (PreparedStatement stmt = conexao.prepareStatement(query)) {
-            stmt.setString(1, schema.trim().toLowerCase());
-            stmt.setString(2, nomeFuncao.trim().toLowerCase());
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, schema);
+            stmt.setString(2, nomeFuncao);
+            stmt.setString(3, argumentos);
     
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1) > 0;
-                }
+                return rs.next();
             }
         }
-        return false;
     }
 
 

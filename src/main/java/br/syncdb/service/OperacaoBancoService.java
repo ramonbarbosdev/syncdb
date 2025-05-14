@@ -62,30 +62,27 @@ public class OperacaoBancoService
         return queryList;
         
     }
-    public List<String> registroExtra(Connection conexaoLocal, Connection conexaoCloud, String tabela, Long id, String pkColumn )
-    {
-        DSLContext dsl = DSL.using(conexaoCloud);
-        Table<Record> tabelaRecord = DSL.table(tabela);
 
-        Result<Record> resultados = dsl.select()
-                                    .from(tabela)
-                                    .where(DSL.field(pkColumn).eq(id))
-                                    .fetch();
-
-        Record valores = resultados.iterator().next() ;
-
-
+    public List<String> registroExtra(Connection conexaoLocal, Connection conexaoCloud, String tabela, Long id, String pkColumn) throws SQLException {
         List<String> queryList = new ArrayList<>();
 
-        queryList.add(dsl.insertInto(tabelaRecord) 
-                                .columns(tabelaRecord.fields()) 
-                                .values(valores) 
-                                .getSQL(ParamType.INLINED)); 
-        // queryList.add(";\n");
+        String sql = "SELECT * FROM " + tabela + " WHERE " + pkColumn + " = ?";
+        try (PreparedStatement stmt = conexaoCloud.prepareStatement(sql)) {
+            stmt.setLong(1, id);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    String insertSQL = construirInsertSQL(tabela, rs);
+                    queryList.add(insertSQL);
+                } else {
+                    throw new SQLException("Nenhum dado encontrado na tabela '" + tabela + "' com ID " + id);
+                }
+            }
+        }
 
         return queryList;
-
     }
+
 
     public void executarQueriesEmLotes(Connection conexao, HashMap<String, List<String>> queries, List<Map<String, String>> detalhes) {
         try
@@ -156,6 +153,7 @@ public class OperacaoBancoService
                 throw e; 
             }
         }
+        
     
         conexao.commit();
 

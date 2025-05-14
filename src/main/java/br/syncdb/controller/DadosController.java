@@ -88,7 +88,7 @@ public class DadosController
 
 		processoManager.iniciarProcesso(() ->
 		{
-			Map<String, Object>  resultado = dadosService.verificarDados(base,  null);
+			Map<String, Object>  resultado = dadosService.verificarDados(base,  tabela);
 			resultadoRef.set(resultado);
 		});
 
