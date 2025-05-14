@@ -33,7 +33,6 @@ public class UtilsSync {
     public void  tratarErroCancelamento(Map<String, Object> response, Exception e)
     { 
         response.put("sucesso", false);
-        response.put("code", 404);
         response.put("error", "Processo cancelado");
         
     }
