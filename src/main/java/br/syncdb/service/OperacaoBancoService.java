@@ -3,6 +3,7 @@ package br.syncdb.service;
 import java.beans.Statement;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -125,11 +126,6 @@ public class OperacaoBancoService
         if (queries == null || queries.isEmpty()) return;
 
         System.out.println("\n=== Executando grupo: " + tipo + " ===");
-
-        if(tipo.contains("Chaves Estrangeiras"))
-        {
-            System.out.println(tipo);
-        }
     
         for (String query : queries)
         {
@@ -138,9 +134,18 @@ public class OperacaoBancoService
             int progressoAtual = (int) ((queriesExecutadas.incrementAndGet() / (double) totalQueries) * 100);
             processoService.enviarProgresso("Processando", progressoAtual, "Processando " + tipo + ": " + tabela, tabela);
     
-            try (java.sql.Statement stmt = conexao.createStatement())
-            {
-                stmt.execute(query);
+            try {
+                if (tipo.contains("Função"))
+                {
+                    executarDDLIsolada(query, conexao);
+                } 
+                else 
+                {
+                    try (java.sql.Statement stmt = conexao.createStatement())
+                    {
+                        stmt.execute(query);
+                    }
+                }
             }
             catch (SQLException e)
             {
@@ -153,10 +158,26 @@ public class OperacaoBancoService
                 throw e; 
             }
         }
-        
-    
         conexao.commit();
+    }
 
+    private void executarDDLIsolada(String scriptCompleto, Connection conexao) throws SQLException
+    {
+        String[] funcoes = scriptCompleto.split("(?=CREATE OR REPLACE )");
+
+        for (String funcao : funcoes)
+        {
+            funcao = funcao.trim();
+            if (funcao.isEmpty()) continue;
+        
+            try (java.sql.Statement stmt = conexao.createStatement())
+            {
+                stmt.execute(funcao);
+            } catch (SQLException e) {
+                System.err.println("Erro ao executar função: " + e.getMessage());
+                throw e;
+            }
+        }
     }
     
     
