@@ -27,8 +27,15 @@ public class UtilsSync {
 
         response.put("sucesso", false);
         response.put("erro",errorType);
-        response.put("mensagem", "Erro durante sincronização");
+        response.put("error", "Erro durante sincronização");
         response.put("detalhes", details);
+    }
+    public void  tratarErroCancelamento(Map<String, Object> response, Exception e)
+    { 
+        response.put("sucesso", false);
+        response.put("code", 404);
+        response.put("error", "Processo cancelado");
+        
     }
     
 }

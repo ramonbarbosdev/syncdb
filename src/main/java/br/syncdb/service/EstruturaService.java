@@ -58,6 +58,33 @@ public class EstruturaService {
     @Autowired
     private CacheService cacheService;
 
+    public Map<String, Object> verificarEstruturaCancelavel(String base, String esquema, String tabela) {
+        Map<String, Object> resultado = new HashMap<>();
+
+        for (int i = 0; i < 100; i++) {
+            if (Thread.currentThread().isInterrupted())
+            {
+                resultado.put("sucesso", false);
+                resultado.put("mensagem", "Processo cancelado pelo usuário");
+                return resultado;
+            }
+
+            // Simula um passo de verificação
+            try {
+                Thread.sleep(100); // Simula processamento
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                resultado.put("sucesso", false);
+                resultado.put("mensagem", "Processo interrompido");
+                return resultado;
+            }
+        }
+
+        resultado.put("sucesso", true);
+        resultado.put("mensagem", "Verificação finalizada com sucesso");
+        return resultado;
+    }
+
     public Map<String, Object> verificarEstrutura(String database, String esquema, String nomeTabela)
     {
         Map<String, Object> response = new LinkedHashMap<>(); 
@@ -65,8 +92,11 @@ public class EstruturaService {
         
         try (Connection conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD); Connection conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL) )
         {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Cancelado");
             Set<String> tabelasLocal = obterTabelas(conexaoLocal, database, nomeTabela);
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Cancelado");
             Set<String> tabelasCloud = obterTabelas(conexaoCloud, database, nomeTabela);
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Cancelado");
 
             HashMap<String, List<String>> queries = processarTabelas(conexaoCloud, conexaoLocal, tabelasCloud, tabelasLocal, detalhes,database, esquema, nomeTabela);
 
@@ -77,6 +107,11 @@ public class EstruturaService {
             }
           
             response.put("sucesso", true); 
+        }
+        catch (InterruptedException e)
+        {
+           utilsSync.tratarErroCancelamento(response, e);
+           Thread.currentThread().interrupt(); 
         }
         catch (SQLException e)
         {
@@ -135,7 +170,7 @@ public class EstruturaService {
     String esquema,
     String nomeTabela
     ) 
-    throws SQLException
+    throws SQLException, InterruptedException 
     {
         List<String> criacaoSchema = Collections.synchronizedList(new ArrayList<>());
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
@@ -158,13 +193,7 @@ public class EstruturaService {
         for (String itemTabela : tabelasCloud)
         {
             //Processamento
-            if (processoService.isCancelado(database))
-            {
-                System.out.println("Operação Cancelada.");
-                processoService.enviarProgresso("Cancelado", 0, "Processamento cancelado pelo usuário", itemTabela);
-                processoService.finalizarProcesso(database);
-                return null;
-            }
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Cancelado");
             int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
             processoService.enviarProgresso("Processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
 
@@ -216,7 +245,6 @@ public class EstruturaService {
         }
 
         processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
-        processoService.finalizarProcesso(database);
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Schemas", criacaoSchema);
