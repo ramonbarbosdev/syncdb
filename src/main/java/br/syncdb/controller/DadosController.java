@@ -2,9 +2,11 @@ package br.syncdb.controller;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.UsuarioDTO;
+import br.syncdb.component.ProcessoManager;
 import br.syncdb.model.Conexao;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.UsuarioRepository;
@@ -47,38 +50,77 @@ public class DadosController
 	@Autowired
 	private DadosService dadosService;
 
-	
+	@Autowired
+	private ProcessoManager processoManager;
 
 	@GetMapping(value = "/verificar/{base}/{esquema}", produces = "application/json")
-	public ResponseEntity<?> verificarDados (@PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema ) 
+	public ResponseEntity<?> verificarDados (@PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema ) throws InterruptedException 
 	{
-		Map<String, Object>  resultado = dadosService.verificarDados(base,  null);
+		AtomicReference<Map<String, Object>> resultadoRef = new AtomicReference<>(new LinkedHashMap<>());
 
-		if ((Boolean) resultado.get("sucesso"))
+		processoManager.iniciarProcesso(() ->
 		{
-			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
-		}
-		else
+			Map<String, Object>  resultado = dadosService.verificarDados(base,  null);
+			resultadoRef.set(resultado);
+		});
+
+		int tentativas = 0;
+		int maxTentativas = 300; 
+		while (processoManager.isExecutando() && tentativas++ < maxTentativas)
 		{
-			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
 		}
+		
+		Map<String, Object> resultado = resultadoRef.get();
+
+		if (Boolean.TRUE.equals(resultado.get("sucesso"))) return new ResponseEntity<>(resultado, HttpStatus.OK);
+				
+		return new ResponseEntity<>(resultado, HttpStatus.NOT_FOUND);
+		
 	}
 	 
 	@GetMapping(value = "/verificar/{base}/{esquema}/{tabela}", produces = "application/json")
-	public ResponseEntity<?> verificarDadosTabela (@PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema,  @PathVariable (value = "tabela") String tabela ) 
+	public ResponseEntity<?> verificarDadosTabela (@PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema,  @PathVariable (value = "tabela") String tabela ) throws InterruptedException  
 	{
-		Map<String, Object>  resultado = dadosService.verificarDados(base,  tabela);
+		AtomicReference<Map<String, Object>> resultadoRef = new AtomicReference<>(new LinkedHashMap<>());
 
-		if ((Boolean) resultado.get("sucesso"))
+		processoManager.iniciarProcesso(() ->
 		{
-			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.OK);
-											
-		}
-		else
+			Map<String, Object>  resultado = dadosService.verificarDados(base,  null);
+			resultadoRef.set(resultado);
+		});
+
+		int tentativas = 0;
+		int maxTentativas = 300; 
+		while (processoManager.isExecutando() && tentativas++ < maxTentativas)
 		{
-			return new ResponseEntity<Map<String, Object>>(resultado, HttpStatus.NOT_FOUND);
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
 		}
+		
+		Map<String, Object> resultado = resultadoRef.get();
+
+		if (Boolean.TRUE.equals(resultado.get("sucesso"))) return new ResponseEntity<>(resultado, HttpStatus.OK);
+				
+		return new ResponseEntity<>(resultado, HttpStatus.NOT_FOUND);
 	}
+
+	@GetMapping(value = "/cancelar", produces = "application/json")
+    public ResponseEntity<Void> cancelar()
+	{
+        processoManager.cancelarProcesso();
+        return ResponseEntity.ok().build();
+    }
+	
  
     @GetMapping(value = "/{base}", produces = "application/json")
 	public ResponseEntity<?> sincronizacao ( @PathVariable (value = "base") String base ) 

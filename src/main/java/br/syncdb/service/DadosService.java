@@ -68,7 +68,9 @@ public class DadosService
        
         try (Connection conexaoCloud = ConexaoBanco.abrirConexao(database, TipoConexao.CLOUD); Connection conexaoLocal = ConexaoBanco.abrirConexao(database, TipoConexao.LOCAL) )
         {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Cancelado");
             HashMap<String, List<String>> querys = obterDadosTabela(database, conexaoCloud,conexaoLocal, tabela, detalhes );
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Cancelado");
 
             if (querys != null ) 
             {
@@ -77,6 +79,11 @@ public class DadosService
             } 
             
             response.put("sucesso", true);
+        }
+        catch (InterruptedException e)
+        {
+           utilsSync.tratarErroCancelamento(response, e);
+           Thread.currentThread().interrupt(); 
         }
         catch (SQLException e)
         {
@@ -503,7 +510,7 @@ public class DadosService
         Connection conexaoLocal, 
         String tabela,
         List<TabelaDetalhe> detalhes
-         ) throws SQLException
+         ) throws SQLException, InterruptedException
     {
 
         processoService.iniciarProcesso(database);
@@ -523,15 +530,8 @@ public class DadosService
         
         for(String itemTabela : tabelas)
         {    
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Cancelado");
 
-            //Processamento
-            if (processoService.isCancelado(database))
-            {
-                System.out.println("Operação Cancelada.");
-                processoService.enviarProgresso("Cancelado", 0, "Processamento cancelado pelo usuário", itemTabela);
-                processoService.finalizarProcesso(database);
-                return null;
-            }
             int progresso = (int) ((tabelasProcessadas.incrementAndGet() / (double) totalTabelas) * 100);
             processoService.enviarProgresso("Processando", progresso, "Processando tabela: " + itemTabela, itemTabela);
 
@@ -598,7 +598,6 @@ public class DadosService
        
         //Processamento
         processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
-        processoService.finalizarProcesso(database);
 
         HashMap<String, List<String>> queries = new LinkedHashMap<>();
         queries.put("Criacao", criacaoDados);
