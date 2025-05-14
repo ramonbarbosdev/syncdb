@@ -29,6 +29,34 @@ public class EstruturaController {
 	@Autowired
 	private ProcessoManager processoManager;
 
+	@GetMapping(value = "/verificar/{base}/{esquema}", produces = "application/json")
+	public ResponseEntity<?> verificarEstrutura ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema ) throws InterruptedException 
+	{
+		AtomicReference<Map<String, Object>> resultadoRef = new AtomicReference<>(new LinkedHashMap<>());
+
+		processoManager.iniciarProcesso(() ->
+		{
+			Map<String, Object> resultado = estruturaService.verificarEstrutura(base, esquema, null);
+			resultadoRef.set(resultado);
+		});
+
+		while (processoManager.isExecutando()) {
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
+		}
+
+		Map<String, Object> resultado = resultadoRef.get();
+
+		if (Boolean.TRUE.equals(resultado.get("sucesso"))) return new ResponseEntity<>(resultado, HttpStatus.OK);
+				
+		return new ResponseEntity<>(resultado, HttpStatus.NOT_FOUND);
+
+	}
+
 	@GetMapping(value = "/verificar/{base}/{esquema}/{tabela}", produces = "application/json")
 	public ResponseEntity<?> verificarEstruturaTabela ( @PathVariable (value = "base") String base , @PathVariable (value = "esquema") String esquema, @PathVariable (value = "tabela") String tabela) throws InterruptedException 
 	{
@@ -40,10 +68,7 @@ public class EstruturaController {
 			resultadoRef.set(resultado);
 		});
 
-		int tentativas = 0;
-		int maxTentativas = 300; 
-		while (processoManager.isExecutando() && tentativas++ < maxTentativas)
-		{
+		while (processoManager.isExecutando()) {
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
@@ -58,37 +83,6 @@ public class EstruturaController {
 				
 		return new ResponseEntity<>(resultado, HttpStatus.NOT_FOUND);
 		
-	}
-
-	@GetMapping(value = "/verificar/{base}/{esquema}", produces = "application/json")
-	public ResponseEntity<?> verificarEstrutura ( @PathVariable (value = "base") String base, @PathVariable (value = "esquema") String esquema ) throws InterruptedException 
-	{
-		AtomicReference<Map<String, Object>> resultadoRef = new AtomicReference<>(new LinkedHashMap<>());
-
-		processoManager.iniciarProcesso(() ->
-		{
-			Map<String, Object> resultado = estruturaService.verificarEstrutura(base, esquema, null);
-			resultadoRef.set(resultado);
-		});
-
-		int tentativas = 0;
-		int maxTentativas = 300; 
-		while (processoManager.isExecutando() && tentativas++ < maxTentativas)
-		{
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				break;
-			}
-		}
-
-		Map<String, Object> resultado = resultadoRef.get();
-
-		if (Boolean.TRUE.equals(resultado.get("sucesso"))) return new ResponseEntity<>(resultado, HttpStatus.OK);
-				
-		return new ResponseEntity<>(resultado, HttpStatus.NOT_FOUND);
-
 	}
 
 	@GetMapping(value = "/cancelar", produces = "application/json")

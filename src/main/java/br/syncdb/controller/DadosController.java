@@ -64,10 +64,7 @@ public class DadosController
 			resultadoRef.set(resultado);
 		});
 
-		int tentativas = 0;
-		int maxTentativas = 300; 
-		while (processoManager.isExecutando() && tentativas++ < maxTentativas)
-		{
+		while (processoManager.isExecutando()) {
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
@@ -95,10 +92,7 @@ public class DadosController
 			resultadoRef.set(resultado);
 		});
 
-		int tentativas = 0;
-		int maxTentativas = 300; 
-		while (processoManager.isExecutando() && tentativas++ < maxTentativas)
-		{
+		while (processoManager.isExecutando()) {
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
