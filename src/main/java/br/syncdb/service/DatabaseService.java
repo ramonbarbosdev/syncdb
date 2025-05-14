@@ -50,7 +50,7 @@ public class DatabaseService
 
         try (Connection conexao = ConexaoBanco.abrirConexao(database, tipo))
         {
-            String query = "SELECT datname FROM pg_database WHERE datistemplate = false";
+            String query = "SELECT datname FROM pg_database WHERE datistemplate = false and  datname not  in ('_dodb', 'defaultdb')";
 
             var stmt = conexao.createStatement();
             var rs = stmt.executeQuery(query);
