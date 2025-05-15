@@ -175,7 +175,7 @@ public class EstruturaService {
 
         }
         
-         List<String>  extencao = databaseService.gerarScriptsExtensoes(conexaoCloud, conexaoLocal);
+        List<String>  extencao = databaseService.gerarScriptsExtensoes(conexaoCloud, conexaoLocal);
         if(extencao.size() > 0)
         {
             EstruturaTabela infoEstruturaExtencao = new EstruturaTabela();

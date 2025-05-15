@@ -34,6 +34,7 @@ import br.syncdb.controller.TipoConexao;
 import br.syncdb.model.Coluna;
 import br.syncdb.model.TableMetadata;
 import br.syncdb.utils.DicionarioTipoSql;
+import br.syncdb.utils.Pair;
 import br.syncdb.utils.UtilsSync;
 
 
@@ -483,37 +484,80 @@ public class DatabaseService
     public List<String> gerarScriptsExtensoes(Connection conexaoCloud, Connection conexaoLocal) throws SQLException {
         List<String> scripts = new ArrayList<>();
 
-        String sqlExtensoesCloud = "SELECT extname FROM pg_extension";
+        Map<String, List<Pair<String, String>>> funcoesPorExtensao = buscarFuncoesPorExtensao(conexaoCloud);
 
-        try (PreparedStatement psCloud = conexaoCloud.prepareStatement(sqlExtensoesCloud);
-            ResultSet rsCloud = psCloud.executeQuery()) {
+        for (Map.Entry<String, List<Pair<String, String>>> entrada : funcoesPorExtensao.entrySet()) {
+            String extensao = entrada.getKey();
+            List<Pair<String, String>> funcoes = entrada.getValue();
 
-            while (rsCloud.next()) {
-                String extensaoCloud = rsCloud.getString("extname");
+            boolean algumaFuncaoNaoExiste = false;
 
-                String sqlCheckLocal = "SELECT 1 FROM pg_extension WHERE extname = ?";
-                boolean existeNoLocal = false;
-
-                try (PreparedStatement psLocal = conexaoLocal.prepareStatement(sqlCheckLocal)) 
-                {
-                    psLocal.setString(1, extensaoCloud);
-                    try (ResultSet rsLocal = psLocal.executeQuery()) {
-                        existeNoLocal = rsLocal.next();
-                    }
+            for (Pair<String, String> funcao : funcoes) {
+                if (!funcaoExisteExtencao(conexaoLocal, funcao.getKey(), funcao.getValue())) {
+                    algumaFuncaoNaoExiste = true;
+                    break;
                 }
+            }
 
-                if (!existeNoLocal) {
-                    String nomeFormatado = extensaoCloud.contains("-") ? "\"" + extensaoCloud + "\"" : extensaoCloud;
-                    scripts.add("CREATE EXTENSION IF NOT EXISTS " + nomeFormatado + ";");
-                }
+            if (algumaFuncaoNaoExiste) {
+                String nomeFormatado = extensao.contains("-") ? "\"" + extensao + "\"" : extensao;
+                scripts.add("CREATE EXTENSION IF NOT EXISTS " + nomeFormatado + ";");
             }
         }
 
         return scripts;
     }
 
+    private Map<String, List<Pair<String, String>>> buscarFuncoesPorExtensao(Connection conexao) throws SQLException {
+        Map<String, List<Pair<String, String>>> map = new HashMap<>();
 
+        String sql = """
+            SELECT 
+                e.extname,
+                p.proname,
+                pg_get_function_identity_arguments(p.oid) AS args
+            FROM 
+                pg_extension e
+            JOIN 
+                pg_depend d ON d.refobjid = e.oid AND d.deptype = 'e'
+            JOIN 
+                pg_proc p ON p.oid = d.objid
+            ORDER BY 
+                e.extname;
+            """;
 
+        try (PreparedStatement stmt = conexao.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                String extensao = rs.getString("extname");
+                String nomeFuncao = rs.getString("proname");
+                String argumentos = rs.getString("args");
+
+                map.computeIfAbsent(extensao, k -> new ArrayList<>())
+                    .add(new Pair<>(nomeFuncao, argumentos));
+            }
+        }
+
+        return map;
+    }
+
+    private boolean funcaoExisteExtencao(Connection conexao, String nomeFuncao, String argumentos) throws SQLException {
+        String sql = """
+            SELECT 1
+            FROM pg_proc p
+            WHERE p.proname = ?
+              AND pg_get_function_identity_arguments(p.oid) = ?;
+            """;
+
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, nomeFuncao);
+            stmt.setString(2, argumentos);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
 
     public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException
     {
