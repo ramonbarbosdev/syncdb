@@ -111,7 +111,7 @@ public class EstruturaService {
             if (querys == null)
             {
                 response.put("sucesso", false);
-                response.put("mensagem", "Nenhuma verificação foi feita previamente.");
+                response.put("error", "Nenhuma verificação foi feita previamente.");
                 return response;
             }
             
@@ -119,7 +119,7 @@ public class EstruturaService {
 
             response.put("sucesso", true); 
             response.put("tabelas_afetadas", detalhes); 
-            response.put("mensagem", "Estrutura Sincronizada.");
+            response.put("error", "Estrutura Sincronizada.");
         
         }
         catch (SQLException e)

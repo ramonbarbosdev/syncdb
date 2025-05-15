@@ -113,14 +113,14 @@ public class DadosService
             if (querys == null)
             {
                 response.put("sucesso", false);
-                response.put("mensagem", "Nenhuma verificação foi feita previamente.");
+                response.put("error", "Nenhuma verificação foi feita previamente.");
                 return response;
             }
             
             operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
             
             response.put("sucesso", true); 
-            response.put("mensagem", "Sincronização de dados concluida"); 
+            response.put("error", "Sincronização de dados concluida"); 
             response.put("tabelas_afetadas", detalhes); 
 
             ativarConstraints(conexaoLocal);
