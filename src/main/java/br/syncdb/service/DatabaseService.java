@@ -424,10 +424,9 @@ public class DatabaseService
         return false;
     }
 
-    public  String  criarFuncoesQuery(Connection conexaoCloud,  Connection conexaoLocal)  throws SQLException
+    public  List<String>  criarFuncoesQuery(Connection conexaoCloud,  Connection conexaoLocal)  throws SQLException
     {
-
-        StringBuilder scriptFuncoes = new StringBuilder();
+        List<String> sqlCache = new ArrayList<>();
 
         String queryFuncoes = """
             SELECT n.nspname AS schema_name,
@@ -449,17 +448,16 @@ public class DatabaseService
                 String nomeFuncao = rsCloud.getString("function_name");
                 String argumentos = rsCloud.getString("arguments");
                 String definicao = rsCloud.getString("function_definition");
-    
-                scriptFuncoes.append(definicao).append("\n\n");
 
                 // if (!funcaoExiste(conexaoLocal, schema, nomeFuncao, argumentos))
                 // {
                 //     scriptFuncoes.append(definicao).append("\n\n");
                 // }
+                  sqlCache.add(definicao);
             }
         }
-    
-        return scriptFuncoes.toString();
+
+        return sqlCache;
     }
 
     private boolean funcaoExiste(Connection conexao, String schema, String nomeFuncao, String argumentos) throws SQLException {

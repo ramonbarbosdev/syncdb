@@ -158,13 +158,18 @@ public class EstruturaService {
         AtomicInteger tabelasProcessadas = new AtomicInteger(0);
         processoService.enviarProgresso("Iniciando", 0, "Iniciando processam de " + totalTabelas + " tabelas", null);
         
-        Set<String> schemasCriados = new HashSet<>();
+        Set<String> verificarSchemasCriados = new HashSet<>();
         
         String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal,esquema);
         if (sequenciaQuery != null)  sequencias.add(sequenciaQuery);
 
-        String  funcao = databaseService.criarFuncoesQuery(conexaoCloud, conexaoCloud);
-        funcoes.add(funcao);
+        EstruturaTabela infoEstruturaFuncao = new EstruturaTabela();
+        List<String>  funcao = databaseService.criarFuncoesQuery(conexaoCloud, conexaoCloud);
+        funcoes.addAll(funcao);
+        infoEstruturaFuncao.setTabela("Todas");
+        infoEstruturaFuncao.setAcao("Funçao");
+        detalhes.add(infoEstruturaFuncao);
+
 
         for (String itemTabela : tabelasCloud)
         {
@@ -180,13 +185,13 @@ public class EstruturaService {
                 System.out.println("Criando estrutura da tabela: " + itemTabela);
                 
                 String schema = utilsSync.extrairSchema(itemTabela); 
-                if (schema != null && !schemasCriados.contains(schema))
+                if (schema != null && !verificarSchemasCriados.contains(schema))
                 {
                     String querySchema = databaseService.gerarQueryCriacaoSchemas(conexaoLocal, schema);
                     if (querySchema != null && !querySchema.isBlank())
                     {
                         criacaoSchema.add(querySchema);
-                        schemasCriados.add(schema);
+                        verificarSchemasCriados.add(schema);
                     }
                 }
 
@@ -218,7 +223,7 @@ public class EstruturaService {
                 }
                
             }
-        }
+        }        
 
         processoService.enviarProgresso("Concluido", 100, "Processamento concluído com sucesso", null);
 

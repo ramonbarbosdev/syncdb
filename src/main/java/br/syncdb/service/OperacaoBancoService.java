@@ -1,6 +1,10 @@
 package br.syncdb.service;
 
 import java.beans.Statement;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -85,7 +89,7 @@ public class OperacaoBancoService
     }
 
 
-    public void executarQueriesEmLotes(Connection conexao, HashMap<String, List<String>> queries, List<Map<String, String>> detalhes) {
+    public void executarQueriesEmLotes(Connection conexao, HashMap<String, List<String>> queries, List<Map<String, String>> detalhes) throws IOException {
         try
         {
             int totalQueries = queries.values().stream().mapToInt(List::size).sum();
@@ -122,7 +126,7 @@ public class OperacaoBancoService
         }
     }
 
-    private void executarGrupoDeQueries(Connection conexao, String tipo, List<String> queries, List<Map<String, String>> detalhes, int totalQueries, AtomicInteger queriesExecutadas) throws SQLException {
+    private void executarGrupoDeQueries(Connection conexao, String tipo, List<String> queries, List<Map<String, String>> detalhes, int totalQueries, AtomicInteger queriesExecutadas) throws SQLException, IOException {
         if (queries == null || queries.isEmpty()) return;
 
         System.out.println("\n=== Executando grupo: " + tipo + " ===");
@@ -134,17 +138,11 @@ public class OperacaoBancoService
             int progressoAtual = (int) ((queriesExecutadas.incrementAndGet() / (double) totalQueries) * 100);
             processoService.enviarProgresso("Processando", progressoAtual, "Processando " + tipo + ": " + tabela, tabela);
     
-            try {
-                if (tipo.contains("Função"))
+            try
+            {
+                 try (java.sql.Statement stmt = conexao.createStatement())
                 {
-                    executarDDLIsolada(query, conexao);
-                } 
-                else 
-                {
-                    try (java.sql.Statement stmt = conexao.createStatement())
-                    {
-                        stmt.execute(query);
-                    }
+                    stmt.execute(query);
                 }
             }
             catch (SQLException e)
@@ -161,26 +159,6 @@ public class OperacaoBancoService
         conexao.commit();
     }
 
-    private void executarDDLIsolada(String scriptCompleto, Connection conexao) throws SQLException
-    {
-        String[] funcoes = scriptCompleto.split("(?=CREATE OR REPLACE )");
-
-        for (String funcao : funcoes)
-        {
-            funcao = funcao.trim();
-            if (funcao.isEmpty()) continue;
-        
-            try (java.sql.Statement stmt = conexao.createStatement())
-            {
-                stmt.execute(funcao);
-            } catch (SQLException e) {
-                System.err.println("Erro ao executar função: " + e.getMessage());
-                throw e;
-            }
-        }
-    }
-    
-    
     public String extrairNomeTabelaDaQuery(String query) {
         query = query.trim().toUpperCase();
     
