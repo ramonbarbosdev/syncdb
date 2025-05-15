@@ -147,10 +147,11 @@ public class EstruturaService {
     {
         List<String> criacaoSchema = Collections.synchronizedList(new ArrayList<>());
         List<String> sequencias = Collections.synchronizedList(new ArrayList<>());
-        List<String> funcoes = Collections.synchronizedList(new ArrayList<>());
         List<String> criacoesTabela = Collections.synchronizedList(new ArrayList<>());
         List<String> chavesEstrangeiras = Collections.synchronizedList(new ArrayList<>());
         List<String> alteracoes = Collections.synchronizedList(new ArrayList<>());
+        List<String> funcoes = Collections.synchronizedList(new ArrayList<>());
+        List<String> extensoes = Collections.synchronizedList(new ArrayList<>());
 
         processoService.iniciarProcesso(database);
 
@@ -163,13 +164,27 @@ public class EstruturaService {
         String sequenciaQuery = databaseService.criarSequenciaQuery(conexaoCloud, conexaoLocal,esquema);
         if (sequenciaQuery != null)  sequencias.add(sequenciaQuery);
 
-        EstruturaTabela infoEstruturaFuncao = new EstruturaTabela();
-        List<String>  funcao = databaseService.criarFuncoesQuery(conexaoCloud, conexaoCloud);
-        funcoes.addAll(funcao);
-        infoEstruturaFuncao.setTabela("Todas");
-        infoEstruturaFuncao.setAcao("Funçao");
-        detalhes.add(infoEstruturaFuncao);
+        List<String>  funcao = databaseService.criarFuncoesQuery(conexaoCloud, conexaoLocal);
+        if(funcao.size() > 0)
+        {   
+            EstruturaTabela infoEstruturaFuncao = new EstruturaTabela();
+            funcoes.addAll(funcao);
+            infoEstruturaFuncao.setTabela("Todas");
+            infoEstruturaFuncao.setAcao("Funçao");
+            detalhes.add(infoEstruturaFuncao);
 
+        }
+        
+         List<String>  extencao = databaseService.gerarScriptsExtensoes(conexaoCloud, conexaoLocal);
+        if(extencao.size() > 0)
+        {
+            EstruturaTabela infoEstruturaExtencao = new EstruturaTabela();
+            extensoes.addAll(extencao);
+            infoEstruturaExtencao.setTabela("Todas");
+            infoEstruturaExtencao.setAcao("Extencao");
+            detalhes.add(infoEstruturaExtencao);
+        }
+     
 
         for (String itemTabela : tabelasCloud)
         {
@@ -233,6 +248,7 @@ public class EstruturaService {
         queries.put("Criação de Tabelas", criacoesTabela);
         queries.put("Chaves Estrangeiras",chavesEstrangeiras);
         queries.put("Alterações",alteracoes);
+        queries.put("Extenção",extencao);
         queries.put("Função",funcoes);
         
         return queries;

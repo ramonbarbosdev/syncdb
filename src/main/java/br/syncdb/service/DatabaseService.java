@@ -449,11 +449,10 @@ public class DatabaseService
                 String argumentos = rsCloud.getString("arguments");
                 String definicao = rsCloud.getString("function_definition");
 
+                sqlCache.add(definicao);
                 // if (!funcaoExiste(conexaoLocal, schema, nomeFuncao, argumentos))
                 // {
-                //     scriptFuncoes.append(definicao).append("\n\n");
                 // }
-                  sqlCache.add(definicao);
             }
         }
 
@@ -480,6 +479,40 @@ public class DatabaseService
             }
         }
     }
+
+    public List<String> gerarScriptsExtensoes(Connection conexaoCloud, Connection conexaoLocal) throws SQLException {
+        List<String> scripts = new ArrayList<>();
+
+        String sqlExtensoesCloud = "SELECT extname FROM pg_extension";
+
+        try (PreparedStatement psCloud = conexaoCloud.prepareStatement(sqlExtensoesCloud);
+            ResultSet rsCloud = psCloud.executeQuery()) {
+
+            while (rsCloud.next()) {
+                String extensaoCloud = rsCloud.getString("extname");
+
+                String sqlCheckLocal = "SELECT 1 FROM pg_extension WHERE extname = ?";
+                boolean existeNoLocal = false;
+
+                try (PreparedStatement psLocal = conexaoLocal.prepareStatement(sqlCheckLocal)) 
+                {
+                    psLocal.setString(1, extensaoCloud);
+                    try (ResultSet rsLocal = psLocal.executeQuery()) {
+                        existeNoLocal = rsLocal.next();
+                    }
+                }
+
+                if (!existeNoLocal) {
+                    String nomeFormatado = extensaoCloud.contains("-") ? "\"" + extensaoCloud + "\"" : extensaoCloud;
+                    scripts.add("CREATE EXTENSION IF NOT EXISTS " + nomeFormatado + ";");
+                }
+            }
+        }
+
+        return scripts;
+    }
+
+
 
 
     public String obterChaveEstrangeira(Connection conexao, String nomeTabela) throws SQLException
