@@ -14,7 +14,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b
 )
 
-set REPOSITORY=ramonbarbosdev/syncdb
+set REPOSITORY=ramonbarbosdev
 
 set IMAGE_NAME=syncdb
 set TAG=latest
@@ -23,7 +23,7 @@ echo "Derrubando os containers existentes..."
 docker-compose down
 
 echo "Recriando e atualizando os containers..."
-docker-compose up --build --force-recreate --remove-orphans
+docker-compose up -d
 
 echo "Construindo a imagem Docker..."
 docker build -t %REPOSITORY%/%IMAGE_NAME%:%TAG% .
