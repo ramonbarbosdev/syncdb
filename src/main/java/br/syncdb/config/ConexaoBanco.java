@@ -89,7 +89,7 @@ public class ConexaoBanco {
 
         Map<String, String> dados = buscarDadosConexao(tipo);
 
-        if(  dados.size() > 0 )
+        if(  dados != null && dados.size() > 0 )
         {
             if (dados == null) throw new SQLException("Falha ao buscar dados da conexão para: " + tipo);
             
@@ -140,7 +140,7 @@ public class ConexaoBanco {
 
         if (tipo == null) throw new IllegalArgumentException("O tipo de conexão não pode ser nulo.");
 
-        if( dados.size() > 0)
+        if( dados != null && dados.size() > 0)
         {
             if( dados.get("host") == null ) throw new IllegalArgumentException("O host do banco de dados "+tipo+" não pode ser nulo ou vazio. Verifique as Conexões!");
             if( dados.get("port") == null ) throw new IllegalArgumentException("A porta do banco de dados "+tipo+" não pode ser nulo ou vazio. Verifique as Conexões!");
