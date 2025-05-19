@@ -51,31 +51,15 @@ public class ConexaoBanco {
    
     public static Connection abrirConexao(String database, TipoConexao tipo) throws SQLException
     {
-        String host = "";
-        String port = "";
-        String user = "";
-        String password = "";
+       
 
-        validacaoConecao(database, tipo);
+        Map<String, String> response = gerenciarConexao(  database,  tipo , false);
 
-        if(tipo.equals(TipoConexao.LOCAL))
-        {
-            host = ConfigPropertiesBanco.get("spring.datasource.host");
-            port = ConfigPropertiesBanco.get("spring.datasource.port");
-            user = ConfigPropertiesBanco.get("spring.datasource.username");
-            password = ConfigPropertiesBanco.get("spring.datasource.password");
-        }
-        else if(tipo.equals(TipoConexao.CLOUD))
-        {
-            host = dotenv.get("DATABASE_" +tipo+ "_HOST");
-            port = dotenv.get("DATABASE_" +tipo+ "_PORT");
-            user = dotenv.get("DATABASE_" +tipo+ "_USER");
-            password  = dotenv.get("DATABASE_" +tipo+ "_PASS");
-        }
-        else
-        {
-            throw new SQLException("Tipo de conexão inválido: " + tipo);
-        }
+        String host = response.get("host");
+        String port = response.get("port");
+        String user = response.get("user");
+        String password = response.get("password");
+
 
         String chave = database + "_" + tipo.name(); 
     
@@ -94,31 +78,87 @@ public class ConexaoBanco {
         return dataSource.getConnection();
     }
 
-    public static void validacaoConecao(String database, TipoConexao tipo) throws SQLException
+    public static Map<String, String> gerenciarConexao(String database, TipoConexao tipo, Boolean form) throws SQLException
     {
-        if (database == null || database.isEmpty())
+        Map<String, String> response = new HashMap<String, String>();
+
+        String host = "";
+        String port = "";
+        String user = "";
+        String password = "";
+
+        Map<String, String> dados = buscarDadosConexao(tipo);
+
+        if(  dados.size() > 0 )
         {
-            throw new IllegalArgumentException("O nome do banco de dados não pode ser nulo ou vazio.");
+            if (dados == null) throw new SQLException("Falha ao buscar dados da conexão para: " + tipo);
+            
+            host = dados.get("host");
+            port = dados.get("port");
+            user = dados.get("user");
+            password = dados.get("password");
+           
         }
-
-        if (tipo == null)
+        else
         {
-            throw new IllegalArgumentException("O tipo de conexão não pode ser nulo.");
+
+            if(tipo.equals(TipoConexao.LOCAL))
+            {
+                host = ConfigPropertiesBanco.get("spring.datasource.host");
+                port = ConfigPropertiesBanco.get("spring.datasource.port");
+                user = ConfigPropertiesBanco.get("spring.datasource.username");
+                password = ConfigPropertiesBanco.get("spring.datasource.password");
+            }
+            else if(tipo.equals(TipoConexao.CLOUD))
+            {
+                host = dotenv.get("DATABASE_" +tipo+ "_HOST");
+                port = dotenv.get("DATABASE_" +tipo+ "_PORT");
+                user = dotenv.get("DATABASE_" +tipo+ "_USER");
+                password  = dotenv.get("DATABASE_" +tipo+ "_PASS");
+            }
+            else
+            {
+                throw new SQLException("Tipo de conexão inválido: " + tipo);
+            }
+
+
         }
 
-        tipo = TipoConexao.CLOUD;
+        validacaoConecao(database, tipo, dados);
 
-        if (dotenv.get("DATABASE_" + tipo + "_HOST") == null || dotenv.get("DATABASE_" + tipo + "_HOST").isEmpty()) {
-            throw new IllegalArgumentException("O host do banco de dados não pode ser nulo ou vazio.");
+        response.put("host", host );
+        response.put("port", port );
+        response.put("user", user );
+        response.put("password", password );
+
+        return response;
+    }
+
+    public static void validacaoConecao(String database, TipoConexao tipo,Map<String, String> dados  ) throws SQLException
+    {
+        if (database == null || database.isEmpty()) throw new IllegalArgumentException("O nome do banco de dados não pode ser nulo ou vazio.");
+
+        if (tipo == null) throw new IllegalArgumentException("O tipo de conexão não pode ser nulo.");
+
+        if( dados.size() > 0)
+        {
+            if( dados.get("host") == null ) throw new IllegalArgumentException("O host do banco de dados "+tipo+" não pode ser nulo ou vazio. Verifique as Conexões!");
+            if( dados.get("port") == null ) throw new IllegalArgumentException("A porta do banco de dados "+tipo+" não pode ser nulo ou vazio. Verifique as Conexões!");
+            if( dados.get("user") == null ) throw new IllegalArgumentException("O usuário do banco de dados "+tipo+" não pode ser nulo ou vazio. Verifique as Conexões!");
+            if( dados.get("password") == null ) throw new IllegalArgumentException("A senha do banco de dados "+tipo+" não pode ser nulo ou vazio. Verifique as Conexões!");
         }
-        if (dotenv.get("DATABASE_" + tipo + "_PORT") == null || dotenv.get("DATABASE_" + tipo + "_PORT").isEmpty()) {
-            throw new IllegalArgumentException("A porta do banco de dados não pode ser nula ou vazia.");
+
+        if (dotenv.get("DATABASE_" + TipoConexao.CLOUD + "_HOST") == null ) {
+            throw new IllegalArgumentException("O host do banco de dados "+tipo+" não pode ser nulo ou vazio. [ARQUIVO .ENV]" );
         }
-        if (dotenv.get("DATABASE_" + tipo + "_USER") == null || dotenv.get("DATABASE_" + tipo + "_USER").isEmpty()) {
-            throw new IllegalArgumentException("O usuário do banco de dados não pode ser nulo ou vazio.");
+        if (dotenv.get("DATABASE_" + TipoConexao.CLOUD + "_PORT") == null ) {
+            throw new IllegalArgumentException("A porta do banco de dados "+tipo+" não pode ser nula ou vazia. [ARQUIVO .ENV]");
         }
-        if (dotenv.get("DATABASE_" + tipo + "_PASS") == null || dotenv.get("DATABASE_" + tipo + "_PASS").isEmpty()) {
-            throw new IllegalArgumentException("A senha do banco de dados não pode ser nula ou vazia.");
+        if (dotenv.get("DATABASE_" + TipoConexao.CLOUD + "_USER") == null ) {
+            throw new IllegalArgumentException("O usuário do banco de dados "+tipo+"não pode ser nulo ou vazio. [ARQUIVO .ENV]");
+        }
+        if (dotenv.get("DATABASE_" + TipoConexao.CLOUD + "_PASS") == null) {
+            throw new IllegalArgumentException("A senha do banco de dados "+tipo+ "não pode ser nula ou vazia. [ARQUIVO .ENV]");
         }
         String chave = database + "_" + tipo.name(); 
     
@@ -214,10 +254,11 @@ public class ConexaoBanco {
            if (rs.next())
            {
                 Map<String, String> dados = new HashMap<>();
-                dados.put("host", rs.getString("host"));
-                dados.put("port", rs.getString("port"));
-                dados.put("user", rs.getString("user"));
-                dados.put("password", rs.getString("password"));
+                adicionarValido(dados, "host", rs.getString("host"));
+                adicionarValido(dados, "port", rs.getString("port"));
+                adicionarValido(dados, "user", rs.getString("user"));
+                adicionarValido(dados, "password", rs.getString("password"));
+                // adicionarValido(dados, "tipoConnect", tipo.toString());
                 return dados;
             } 
           
@@ -228,6 +269,13 @@ public class ConexaoBanco {
         }
         return null;
        
+    }
+
+    private static void adicionarValido(Map<String, String> mapa, String chave, String valor)
+    {
+        if (valor != null && !valor.trim().isEmpty()) {
+            mapa.put(chave, valor);
+        }
     }
     
 }
