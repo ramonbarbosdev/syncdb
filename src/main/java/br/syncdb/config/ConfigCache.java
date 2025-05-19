@@ -15,7 +15,7 @@ public class ConfigCache {
     public Cache<String, Object> estruturaCache()
     {
         return Caffeine.newBuilder()
-                .expireAfterWrite(10, TimeUnit.MINUTES)
+                .expireAfterWrite(60, TimeUnit.MINUTES)
                 .maximumSize(100)
                 .build();
     }
