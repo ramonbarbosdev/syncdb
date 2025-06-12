@@ -4,7 +4,7 @@ COPY pom.xml .
 COPY src ./src
 COPY .env .env
 
-RUN mvn clean package -DskipTests -Ddocker
+RUN mvn clean package -DskipTests -Drender
 
 FROM eclipse-temurin:17-jdk
 WORKDIR /app
