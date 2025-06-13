@@ -117,9 +117,15 @@ public class EstruturaService {
             
             operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
 
+            List<String> listaErro = new ArrayList<>();
+            for(Map<String, String> erro : detalhes)
+            {
+                listaErro.add(erro.get("erro"));
+            }
+
             response.put("sucesso", true); 
             response.put("tabelas_afetadas", detalhes); 
-            response.put("error", "Estrutura Sincronizada.");
+            response.put("error", listaErro);
         
         }
         catch (SQLException e)
