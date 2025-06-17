@@ -39,7 +39,7 @@ public class WebConfigSecurity {
                     .requestMatchers(HttpMethod.POST, "/auth/register").permitAll() 
             		.requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
             		.requestMatchers(HttpMethod.OPTIONS,"/index").permitAll()
-            		.requestMatchers(HttpMethod.OPTIONS,"/ws/**").permitAll()
+            		.requestMatchers(HttpMethod.OPTIONS,"/socket/**").permitAll()
                     .anyRequest().authenticated() 
             )
             .logout(logout -> logout
@@ -66,7 +66,8 @@ public class WebConfigSecurity {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:4200", "http://localhost:3000", "https://syncdb-mfa3.onrender.com")); // Libera o Angular
+         configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*")); 
+        // configuration.setAllowedOrigins(Arrays.asList( "http://localhost:*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true); 

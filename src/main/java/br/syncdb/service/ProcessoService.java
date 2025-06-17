@@ -55,6 +55,7 @@ public class ProcessoService {
         progressoMsg.put("tabelaAtual", tabelaAtual);
         progressoMsg.put("timestamp", System.currentTimeMillis());
 
+        // System.out.println("Enviando progresso para /topic/sync/progress");
         messagingTemplate.convertAndSend("/topic/sync/progress", progressoMsg);
     }
    

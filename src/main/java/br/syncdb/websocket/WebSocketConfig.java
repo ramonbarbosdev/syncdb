@@ -26,16 +26,20 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     .setSendBufferSizeLimit(512 * 1024)
                     .setMessageSizeLimit(128 * 1024);
     }
-    @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws") 
-                .addInterceptors(jwtHandshakeInterceptor)
-                .setAllowedOriginPatterns("*");
+
+
+     @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry)
+    {
+        registry.addEndpoint("/socket")
+            .addInterceptors(jwtHandshakeInterceptor)
+            .setAllowedOriginPatterns("http://localhost:*")
+            .withSockJS();
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/queue")
+        registry.enableSimpleBroker("/topic", "/app")
                 .setHeartbeatValue(new long[]{4000, 4000})
                 .setTaskScheduler(messageBrokerTaskScheduler());
         registry.setApplicationDestinationPrefixes("/app");
