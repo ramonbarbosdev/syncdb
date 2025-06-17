@@ -119,9 +119,15 @@ public class DadosService
             
             operacaoBancoService.executarQueriesEmLotes(conexaoLocal, querys, detalhes);
             
+            List<String> listaErro = new ArrayList<>();
+            for(Map<String, String> erro : detalhes)
+            {
+                listaErro.add(erro.get("erro"));
+            }
+
             response.put("sucesso", true); 
-            response.put("error", "Sincronização de dados concluida"); 
             response.put("tabelas_afetadas", detalhes); 
+            response.put("error", listaErro);
 
             ativarConstraints(conexaoLocal);
 
