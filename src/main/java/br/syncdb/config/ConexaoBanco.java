@@ -27,12 +27,8 @@ public class ConexaoBanco {
 
     private static final Dotenv dotenv;
 
-    private final JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    public ConexaoBanco(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
+
 
     static {
         try {
@@ -52,8 +48,6 @@ public class ConexaoBanco {
     private static final Map<String, HikariDataSource> dataSourceMap = new ConcurrentHashMap<>();
 
     private static HikariDataSource criarDataSource(String host, String port, String database, String user, String password) {
-
-      
 
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://" + host + ":" + port + "/" + database);
@@ -101,6 +95,7 @@ public class ConexaoBanco {
         
         return dataSource.getConnection();
     }
+  
 
     public static Map<String, String> gerenciarConexao(String database, TipoConexao tipo, Boolean form) throws SQLException
     {

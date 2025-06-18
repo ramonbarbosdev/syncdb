@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.syncdb.DTO.ConexaoDTO;
+import br.syncdb.config.ConexaoBanco;
 import br.syncdb.model.Conexao;
 import br.syncdb.model.Usuario;
 import br.syncdb.repository.ConexaoRepository;
@@ -67,6 +68,8 @@ public class ConexaoController
         conexaoModel.setDb_local_password(conexaoDTO.getLocal().getDb_local_password());
 
         repository.save(conexaoModel);
+
+        ConexaoBanco.fecharTodos();
 
         return new ResponseEntity<Conexao>(conexaoModel, HttpStatus.OK);
     }
