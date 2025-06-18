@@ -4,8 +4,13 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import br.syncdb.controller.TipoConexao;
+import br.syncdb.utils.SqliteUtils;
 import io.github.cdimascio.dotenv.Dotenv;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -15,13 +20,24 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 public class ConexaoBanco {
 
     private static final Dotenv dotenv;
 
+    private final JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public ConexaoBanco(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
     static {
         try {
             dotenv = Dotenv.configure()
+                            // .directory("src/main/resources/.env")  
                             .directory("./.env")  
                             .load();
                             
@@ -36,6 +52,9 @@ public class ConexaoBanco {
     private static final Map<String, HikariDataSource> dataSourceMap = new ConcurrentHashMap<>();
 
     private static HikariDataSource criarDataSource(String host, String port, String database, String user, String password) {
+
+      
+
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://" + host + ":" + port + "/" + database);
         config.setUsername(user);
@@ -64,6 +83,11 @@ public class ConexaoBanco {
         String chave = database + "_" + tipo.name(); 
     
         HikariDataSource dataSource = dataSourceMap.get(chave);
+
+        if (host == null || host.isBlank() || port == null || port.isBlank()) {
+            throw new SQLException("Dados incompletos: host ou porta ausentes ao tentar conectar com o banco " + tipo);
+        }
+
         if (dataSource == null)
         {
             synchronized (ConexaoBanco.class) {
@@ -219,56 +243,45 @@ public class ConexaoBanco {
         dataSourceMap.clear(); 
     }
 
-    public static Map<String, String>  buscarDadosConexao( TipoConexao tipo) 
-    {
     
-        String user = ConfigPropertiesBanco.get("spring.datasource.username");
-        String password = ConfigPropertiesBanco.get("spring.datasource.password");
-        String url = ConfigPropertiesBanco.get("spring.datasource.url");
+     public static Map<String, String> buscarDadosConexao(TipoConexao tipo) {
+        String urlBaseDbPath = ConfigPropertiesBanco.get("app.db.path"); 
 
-        try( Connection conexao = DriverManager.getConnection(  url, user,password);)
-        {   
+        String jdbcUrl = SqliteUtils.montaJdbcUrl(urlBaseDbPath);
+      
+        String arquivoPath = SqliteUtils.extrairCaminhoArquivo(jdbcUrl);
+        SqliteUtils.garantirDiretorioPai(arquivoPath);
+    
+        try (Connection conexao = DriverManager.getConnection(jdbcUrl)) {
             StringBuilder query = new StringBuilder();
-
-            if(tipo == TipoConexao.CLOUD)
-            {
-                query.append(
-                    "select  db_cloud_host as host, db_cloud_password as password, db_cloud_port as port, db_cloud_user  as user from conexao limit 1 "
-                );
-            }
-            else if(tipo == TipoConexao.LOCAL)
-            {
-                query.append(
-                    "select db_local_host as host , db_local_password as password, db_local_port as port, db_local_user as user from conexao limit 1"
-                );
-            }
-            else
-            {
+            if (tipo == TipoConexao.CLOUD) {
+                query.append("select db_cloud_host as host, db_cloud_password as password, db_cloud_port as port, db_cloud_user as user from conexao limit 1");
+            } else if (tipo == TipoConexao.LOCAL) {
+                query.append("select db_local_host as host, db_local_password as password, db_local_port as port, db_local_user as user from conexao limit 1");
+            } else {
                 throw new SQLException("Tipo de conexão inválido: " + tipo);
             }
 
-            PreparedStatement stmt = conexao.prepareStatement(query.toString());
+            try (PreparedStatement stmt = conexao.prepareStatement(query.toString());
+                 ResultSet rs = stmt.executeQuery()) {
 
-            ResultSet rs = stmt.executeQuery();
-
-           if (rs.next())
-           {
-                Map<String, String> dados = new HashMap<>();
-                adicionarValido(dados, "host", rs.getString("host"));
-                adicionarValido(dados, "port", rs.getString("port"));
-                adicionarValido(dados, "user", rs.getString("user"));
-                adicionarValido(dados, "password", rs.getString("password"));
-                // adicionarValido(dados, "tipoConnect", tipo.toString());
-                return dados;
-            } 
-          
-        }
-        catch (SQLException e)
-        {
+                if (rs.next()) {
+                    Map<String, String> dados = new HashMap<>();
+                    adicionarValido(dados, "host", rs.getString("host"));
+                    adicionarValido(dados, "port", rs.getString("port"));
+                    adicionarValido(dados, "user", rs.getString("user"));
+                    adicionarValido(dados, "password", rs.getString("password"));
+                    return dados;
+                } else {
+                    System.out.println("[ConexaoBanco] Nenhum registro encontrado na tabela 'conexao' para tipo " + tipo);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[ConexaoBanco] Erro ao buscar dados de conexão: " + e.getMessage());
             e.printStackTrace();
         }
+
         return null;
-       
     }
 
     private static void adicionarValido(Map<String, String> mapa, String chave, String valor)

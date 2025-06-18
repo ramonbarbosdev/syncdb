@@ -1,5 +1,7 @@
 package br.syncdb;
 
+import java.nio.file.Paths;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
