@@ -37,18 +37,14 @@ public class WebConfigSecurity {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.POST, "/auth/login").permitAll() 
                     .requestMatchers(HttpMethod.POST, "/auth/register").permitAll() 
+                    .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll() 
                     .requestMatchers(HttpMethod.GET, "/status/**").permitAll() 
             		.requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
             		.requestMatchers(HttpMethod.OPTIONS,"/index").permitAll()
             		.requestMatchers(HttpMethod.OPTIONS,"/socket/**").permitAll()
                     .anyRequest().authenticated() 
             )
-            .logout(logout -> logout
-                .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))  
-                .logoutSuccessUrl("/index")  
-                .permitAll()
-            )
-            .addFilterBefore(new JwtApiAutenticacaoFilter(), UsernamePasswordAuthenticationFilter.class)
+                 .addFilterBefore(new JwtApiAutenticacaoFilter(), UsernamePasswordAuthenticationFilter.class)
             // .addFilterBefore(new JWTLoginFilter("/login", authenticationManager), UsernamePasswordAuthenticationFilter.class)
             .build();  
 

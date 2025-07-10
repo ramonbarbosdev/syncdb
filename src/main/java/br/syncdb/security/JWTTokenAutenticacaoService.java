@@ -5,6 +5,9 @@ import java.security.Principal;
 import java.security.SignatureException;
 import java.util.Date;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -27,11 +30,14 @@ import jakarta.servlet.http.HttpServletResponse;
 @Service
 public class JWTTokenAutenticacaoService {
 
-    private static final long EXPIRATION_TIME = 172800000; // 2 dias
+    private static final long EXPIRATION_TIME = 172800000;
     private static final String TOKEN_PREFIX = "Bearer ";
     private static final String HEADER_STRING = "Authorization";
 
     private static final String SECRET_KEY_BASE64 = "HaqrDaAaICtFZNXjm5Q3dPNgAZX+bnf6efMy2HuIO1Iq928rcmtTltoAFhsROHxNwtcHjB6FWudgjqxBMXAP8w==";
+
+    @Value("${server.servlet.context-path}")
+    private String CHAVE_COOKIE;
 
     public static SecretKeySpec createSecretKey() {
         String cleanedKey = SECRET_KEY_BASE64.replaceAll("\\s", "");
@@ -63,8 +69,7 @@ public class JWTTokenAutenticacaoService {
         return token;
     }
 
-    public Authentication getAuthentication(HttpServletRequest request, HttpServletResponse response)
-    {
+    public Authentication getAuthentication(HttpServletRequest request, HttpServletResponse response) {
         SecretKeySpec secretKey = createSecretKey();
         String token = request.getHeader(HEADER_STRING);
 
@@ -72,9 +77,7 @@ public class JWTTokenAutenticacaoService {
 
         if (cookieToken != null && !cookieToken.isEmpty()) {
             token = TOKEN_PREFIX + cookieToken;
-        }
-        else
-        {
+        } else {
             token = request.getHeader(HEADER_STRING);
         }
 
@@ -102,8 +105,7 @@ public class JWTTokenAutenticacaoService {
                     }
                 }
 
-            } 
-            catch (ExpiredJwtException e) {
+            } catch (ExpiredJwtException e) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 try {
@@ -111,8 +113,7 @@ public class JWTTokenAutenticacaoService {
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
-            }
-            catch (MalformedJwtException e) {
+            } catch (MalformedJwtException e) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 try {
@@ -120,8 +121,7 @@ public class JWTTokenAutenticacaoService {
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 try {
@@ -137,25 +137,34 @@ public class JWTTokenAutenticacaoService {
         return null;
     }
 
-    private void inserirJwtCookie(String jwt, HttpServletResponse response) {
-        Cookie cookie = new Cookie("access_token", jwt);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false); 
-        cookie.setPath("/syncdb");
-        cookie.setMaxAge(3600); // Expiração de 1 hora
-        
-        response.addCookie(cookie);  
+    public void inserirJwtCookie(String jwt, HttpServletResponse response) {
+        StringBuilder cookieValue = new StringBuilder();
+        cookieValue.append("access_token=").append(jwt)
+                .append("; Path=").append(CHAVE_COOKIE)
+                .append("; HttpOnly")
+                .append("; Secure")
+                .append("; SameSite=None")
+                .append("; Max-Age=3600"); // 1 hora
+
+        response.addHeader("Set-Cookie", cookieValue.toString());
     }
 
-    private String obterTokenCookie(HttpServletRequest request)
-    {
+    public void removerJwtCookie(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("access_token", "")
+                .maxAge(0)
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .path(CHAVE_COOKIE)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
 
-        if (request.getCookies() != null)
-        {
-            for (Cookie cookie : request.getCookies())
-            {
-                if ("access_token".equals(cookie.getName()))
-                {
+    private String obterTokenCookie(HttpServletRequest request) {
+
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("access_token".equals(cookie.getName())) {
                     return cookie.getValue();
                 }
             }

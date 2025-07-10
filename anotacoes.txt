@@ -1,0 +1,2 @@
+se der erro de : with preset Content-Type 'application/json;charset=ISO-8859-1' 
+e no front tiver erro com o codigo de 403 então tem token preso no navegador 

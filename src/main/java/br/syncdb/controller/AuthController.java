@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -82,6 +83,17 @@ public class AuthController {
         Usuario usuarioSalvo = usuarioRepository.save(usuario);
     
         return new ResponseEntity<Usuario>(usuarioSalvo, HttpStatus.CREATED);
+    }
+
+    @PostMapping(value = "/logout", produces = "application/json")
+    public ResponseEntity<?> logout(Authentication authentication, HttpServletResponse response) {
+        if (authentication != null && authentication.isAuthenticated()) {
+            
+            jwtTokenAutenticacaoService.removerJwtCookie(response);
+
+            return ResponseEntity.ok(Map.of("message", "Logout realizado com sucesso."));
+        }
+        return ResponseEntity.status(401).body(Map.of("message", "Usuário não autenticado."));
     }
     
     
