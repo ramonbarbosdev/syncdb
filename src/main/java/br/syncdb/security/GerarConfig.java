@@ -15,10 +15,10 @@ public class GerarConfig {
 
         String json = """
             {
-              "user": "admin",
-              "password": "admin",
-              "host": "localhost",
-              "port": "5432"
+              "user": "doadmin",
+              "password": "AVNS_ThcFV7CzqE1EzYP7W8z",
+              "host": "db-postgresql-nyc3-32073-do-user-9424476-0.b.db.ondigitalocean.com",
+              "port": "25060"
             }
             """;
 

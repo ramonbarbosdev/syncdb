@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,6 +41,7 @@ public class ConexaoController {
         conexaoModel.setDb_cloud_port(conexaoDTO.getCloud().getDb_cloud_port());
         conexaoModel.setDb_cloud_user(conexaoDTO.getCloud().getDb_cloud_user());
         conexaoModel.setDb_cloud_password(conexaoDTO.getCloud().getDb_cloud_password());
+        conexaoModel.setFl_admin(false);
 
         conexaoModel.setDb_local_host(conexaoDTO.getLocal().getDb_local_host());
         conexaoModel.setDb_local_port(conexaoDTO.getLocal().getDb_local_port());
@@ -66,6 +68,7 @@ public class ConexaoController {
         conexaoModel.setDb_cloud_port(conexaoDTO.getCloud().getDb_cloud_port());
         conexaoModel.setDb_cloud_user(conexaoDTO.getCloud().getDb_cloud_user());
         conexaoModel.setDb_cloud_password(conexaoDTO.getCloud().getDb_cloud_password());
+        conexaoModel.setFl_admin(false);
 
         conexaoModel.setDb_local_host(conexaoDTO.getLocal().getDb_local_host());
         conexaoModel.setDb_local_port(conexaoDTO.getLocal().getDb_local_port());
@@ -94,6 +97,7 @@ public class ConexaoController {
         cloud.setDb_cloud_port(conexao.getDb_cloud_port());
         cloud.setDb_cloud_user(conexao.getDb_cloud_user());
         cloud.setDb_cloud_password(conexao.getDb_cloud_password());
+        cloud.setFl_admin(conexao.getFl_admin());
 
         ConexaoDTO.LocalConnection local = new ConexaoDTO.LocalConnection();
         local.setDb_local_host(conexao.getDb_local_host());
@@ -108,9 +112,13 @@ public class ConexaoController {
         return ResponseEntity.ok(conexaoDTO);
     }
 
-    @PostMapping("/certificado/upload")
-    public ResponseEntity<?> uploadCertificado(@RequestParam("arquivo") MultipartFile arquivo) {
+    @PostMapping("/certificado/upload/{id_conexao}")
+    public ResponseEntity<?> uploadCertificado(@PathVariable Long id_conexao,
+            @RequestParam("arquivo") MultipartFile arquivo) {
         try {
+
+            System.out.println(id_conexao);
+
             // byte[] chave = CriptoUtils.gerarChave256(System.getenv("SEGREDO_CONFIG"));
             String segredo = "wD7#G2k!91zL*qpB3VmX8eTR";
 
@@ -126,17 +134,28 @@ public class ConexaoController {
                 return ResponseEntity.badRequest().body("Certificado inválido.");
             }
 
-            ConexaoDTO.CloudConnection cloud = new ConexaoDTO.CloudConnection();
-            cloud.setDb_cloud_host(obj.getString("host"));
-            cloud.setDb_cloud_port(obj.getString("port"));
-            cloud.setDb_cloud_user(obj.getString("user"));
-            cloud.setDb_cloud_password(obj.getString("password"));
+            Optional<Conexao> conexaoModelOptional = repository.findById(id_conexao);
 
-            System.out.println(cloud);
+            if (!conexaoModelOptional.isPresent()) {
 
+                Conexao conexaoModel = new Conexao();
+                conexaoModel.setDb_cloud_host(obj.getString("host"));
+                conexaoModel.setDb_cloud_port(obj.getString("port"));
+                conexaoModel.setDb_cloud_user(obj.getString("user"));
+                conexaoModel.setDb_cloud_password(obj.getString("password"));
+                conexaoModel.setFl_admin(true);
+                repository.save(conexaoModel);
 
-            // Aqui você pode salvar os dados na memória, cache, sessão ou arquivo
-            // temporário
+            } else {
+                Conexao conexaoModel = conexaoModelOptional.get();
+                conexaoModel.setDb_cloud_host(obj.getString("host"));
+                conexaoModel.setDb_cloud_port(obj.getString("port"));
+                conexaoModel.setDb_cloud_user(obj.getString("user"));
+                conexaoModel.setDb_cloud_password(obj.getString("password"));
+                conexaoModel.setFl_admin(true);
+                repository.save(conexaoModel);
+            }
+
             return ResponseEntity.ok("Certificado válido e processado com sucesso.");
 
         } catch (Exception e) {

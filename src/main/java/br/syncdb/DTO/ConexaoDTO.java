@@ -32,6 +32,7 @@ public class ConexaoDTO
         private String db_cloud_port;
         private String db_cloud_user;
         private String db_cloud_password;
+        private Boolean fl_admin;
         // getters e setters
 
        public String getDb_cloud_host() {
@@ -58,6 +59,15 @@ public class ConexaoDTO
        public void setDb_cloud_user(String db_cloud_user) {
            this.db_cloud_user = db_cloud_user;
        }
+
+       public Boolean getFl_admin() {
+           return fl_admin;
+       }
+       public void setFl_admin(Boolean fl_admin) {
+           this.fl_admin = fl_admin;
+       }
+
+       
     }
 
     public static class LocalConnection
@@ -66,6 +76,7 @@ public class ConexaoDTO
         private String db_local_port;
         private String db_local_user;
         private String db_local_password;
+
 
         public String getDb_local_host() {
             return db_local_host;
@@ -91,6 +102,8 @@ public class ConexaoDTO
         public void setDb_local_user(String db_local_user) {
             this.db_local_user = db_local_user;
         }
+
+     
         
        
     }
