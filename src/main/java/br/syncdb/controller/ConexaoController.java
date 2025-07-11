@@ -41,7 +41,7 @@ public class ConexaoController {
         conexaoModel.setDb_cloud_port(conexaoDTO.getCloud().getDb_cloud_port());
         conexaoModel.setDb_cloud_user(conexaoDTO.getCloud().getDb_cloud_user());
         conexaoModel.setDb_cloud_password(conexaoDTO.getCloud().getDb_cloud_password());
-        conexaoModel.setFl_admin(false);
+        conexaoModel.setFl_admin(conexaoDTO.getCloud().getFl_admin());
 
         conexaoModel.setDb_local_host(conexaoDTO.getLocal().getDb_local_host());
         conexaoModel.setDb_local_port(conexaoDTO.getLocal().getDb_local_port());
@@ -62,13 +62,27 @@ public class ConexaoController {
                     .body("{\"erro\": \"Conexao não encontrada para atualizar!\"}");
         }
 
+        Boolean fl_admin = conexaoDTO.getCloud().getFl_admin();
+        Boolean fl_adminantigo = conexaoModelOptional.get().getFl_admin();
         Conexao conexaoModel = conexaoModelOptional.get();
 
         conexaoModel.setDb_cloud_host(conexaoDTO.getCloud().getDb_cloud_host());
         conexaoModel.setDb_cloud_port(conexaoDTO.getCloud().getDb_cloud_port());
         conexaoModel.setDb_cloud_user(conexaoDTO.getCloud().getDb_cloud_user());
         conexaoModel.setDb_cloud_password(conexaoDTO.getCloud().getDb_cloud_password());
-        conexaoModel.setFl_admin(false);
+        conexaoModel.setFl_admin(fl_admin);
+
+        if (fl_admin == false && fl_adminantigo == true) {
+
+            if (conexaoModelOptional.get().getDb_cloud_user().contains(conexaoDTO.getCloud().getDb_cloud_user())
+                    || conexaoModelOptional.get().getDb_cloud_password()
+                            .contains(conexaoDTO.getCloud().getDb_cloud_password())) {
+                conexaoModel.setDb_cloud_user("");
+                conexaoModel.setDb_cloud_password("");
+            }
+
+        }
+
 
         conexaoModel.setDb_local_host(conexaoDTO.getLocal().getDb_local_host());
         conexaoModel.setDb_local_port(conexaoDTO.getLocal().getDb_local_port());
