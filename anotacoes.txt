@@ -1,2 +1,9 @@
 se der erro de : with preset Content-Type 'application/json;charset=ISO-8859-1' 
 e no front tiver erro com o codigo de 403 então tem token preso no navegador 
+
+mvn clean package -DskipTests 
+
+mvn exec:java -Dexec.mainClass="br.syncdb.security.GerarConfig"
+SEGREDO: https://passwordsgenerator.net  OU wD7#G2k!91zL*qpB3VmX8eTR
+
+

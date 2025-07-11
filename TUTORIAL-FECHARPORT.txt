@@ -3,5 +3,3 @@ netstat -ano | findstr :8081 (ou a porta que quer fechar)
 ex:   TCP    0.0.0.0:8081           0.0.0.0:0              LISTENING       1234
 tasklist /fi "PID eq 1234"
 taskkill /PID 1234 /F
-
-mvn clean package -DskipTests 

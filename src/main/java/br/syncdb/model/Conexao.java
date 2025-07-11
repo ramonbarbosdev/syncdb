@@ -26,6 +26,8 @@ public class Conexao {
     private String db_local_user;
     private String db_local_password;
 
+    private Boolean fl_admin;
+
     //gettes e setters
     public Long getId_conexao() {
         return id_conexao;
@@ -83,6 +85,15 @@ public class Conexao {
     public void setDb_local_user(String db_local_user) {
         this.db_local_user = db_local_user;
     }
+
+    public Boolean getFl_admin() {
+        return fl_admin;
+    }
+
+    public void setFl_admin(Boolean fl_admin) {
+        this.fl_admin = fl_admin;
+    }
+    
     
     
 
