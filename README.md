@@ -32,6 +32,9 @@ A arquitetura do sistema é baseada na comunicação entre dois bancos de dados,
 
 ## Como Usar
 
+- Execultar arquivo .jar : java -jar nome_do_arquivo.jar
+
+
 ### Pré-requisitos
 
 Antes de começar, você precisa garantir que tem os seguintes pré-requisitos instalados:
